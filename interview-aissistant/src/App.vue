@@ -1,31 +1,21 @@
-
 <template>
-  <div class="left-main-menu">
-    <a-menu v-model:selectedKeys="state.selectedKeys" mode="inline" :open-keys="state.openKeys" :items="items"
-      @openChange="onOpenChange"></a-menu>
-  </div>
-  <div class="main-top">
-    <div id="main-top-right-login">
-      登录
-    </div>
-  </div>
-
-  <!-- 背景盒子 -->
-    <div class="background"></div>
-
-    <!-- 顶部导航栏 -->
+  <div class="main-container">
+      <!-- 顶部导航栏 -->
     <header>
       <nav>
         <div class="links-box">
-
         </div>
         <div @click="change_display_loginform" class="nav-login-box">
             LOGIN
         </div>
       </nav>
     </header>
-
-    <!-- 登陆表单界面 -->
+  <div class="left-main-menu">
+    <a-menu v-model:selectedKeys="state.selectedKeys" mode="inline" :open-keys="state.openKeys" :items="items"
+      @openChange="onOpenChange"></a-menu>
+  </div>
+  <div class="right-content">
+        <!-- 登陆表单界面 -->
     <div v-if="display_loginform" class="loginform-box">
       <form action="">
 
@@ -45,12 +35,13 @@
           <button class="login-btn">Login</button>
           <p><a href="#">To Sign up</a></p>
         </div>
-
       </form>
     </div>
-
+  </div>
+  </div>
 </template>
 <script setup>
+/ ---------------------------------------------------------------*/
 //登录
 import { ref } from 'vue';
 
@@ -62,6 +53,7 @@ const change_display_loginform = ()=> {
   display_loginform.value = ! display_loginform.value;
 }
 
+/ ---------------------------------------------------------------*/
 //左侧主菜单
 import { h, reactive } from 'vue';
 import { MailOutlined, AppstoreOutlined, SettingOutlined } from '@ant-design/icons-vue';
@@ -110,36 +102,9 @@ const onOpenChange = openKeys => {
 
 </script>
 <style scoped>
-.left-main-menu {
-  height: 100%;
-  border-left: 0;
-  width: 20%;
-  display: flex;
-}
 
-.main-top {
-  height: 5%;
-  display: flex;
-  justify-content: flex-end;
-
-  #main-top-right-login {
-    width: 32px;
-    height: 100%;
-    background-color: #b4d7f0;
-  }
-}
-
-/* 导入字体 */
-@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;1,500&display=swap');
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: "poppins", sans-serif;
-}
-
-.background {
+.main-container  {
+  display:flex;
   position: relative;
   background: linear-gradient(
     to right,
@@ -150,6 +115,27 @@ const onOpenChange = openKeys => {
   background-size: cover;
   height: 100vh;
   width: 100%;
+}
+
+.left-main-menu, .right-content{
+  flex: 1; /* 等分剩余空间 */
+}
+
+.left-main-menu {
+  height: 100%;
+  border-left: 0;
+  width: 20%;
+  display: flex;
+}
+
+/* 导入字体 */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;1,500&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "poppins", sans-serif;
 }
 
 header {
