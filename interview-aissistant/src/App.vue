@@ -1,43 +1,44 @@
 <template>
-  <div class="main-container">
-      <!-- 顶部导航栏 -->
+     <!-- 顶部导航栏 -->
     <header>
       <nav>
         <div class="links-box">
         </div>
         <div @click="change_display_loginform" class="nav-login-box">
-            LOGIN
+          LOGIN
         </div>
       </nav>
     </header>
-  <div class="left-main-menu">
-    <a-menu v-model:selectedKeys="state.selectedKeys" mode="inline" :open-keys="state.openKeys" :items="items"
-      @openChange="onOpenChange"></a-menu>
-  </div>
-  <div class="right-content">
-        <!-- 登陆表单界面 -->
-    <div v-if="display_loginform" class="loginform-box">
-      <form action="">
-
-        <div class="login-title"><h2>Login</h2></div>
-
-        <div class="input-box">
-          <label for="username">用户名:</label>
-          <input type="text" id="username">
-        </div>
-
-        <div class="input-box">
-          <label for="password">密码:</label>
-          <input type="password" id="password">
-        </div>
-
-        <div class="login-btn-box">
-          <button class="login-btn">Login</button>
-          <p><a href="#">To Sign up</a></p>
-        </div>
-      </form>
+  <div class="main-container">
+    <div class="left-main-menu">
+      <a-menu v-model:selectedKeys="state.selectedKeys" mode="inline" :open-keys="state.openKeys" :items="items"
+        @openChange="onOpenChange"></a-menu>
     </div>
-  </div>
+    <div class="right-main-content">
+      <!-- 登陆表单界面 -->
+      <div v-if="display_loginform" class="loginform-box">
+        <form action="">
+          <div class="login-title">
+            <h2>Login</h2>
+          </div>
+
+          <div class="input-box">
+            <label for="username">用户名:</label>
+            <input type="text" id="username">
+          </div>
+
+          <div class="input-box">
+            <label for="password">密码:</label>
+            <input type="password" id="password">
+          </div>
+
+          <div class="login-btn-box">
+            <button class="login-btn">Login</button>
+            <p><a href="#">To Sign up</a></p>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 </template>
 <script setup>
@@ -102,6 +103,14 @@ const onOpenChange = openKeys => {
 
 </script>
 <style scoped>
+/* 导入字体 */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;1,500&display=swap');
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "poppins", sans-serif;
+}
 
 .main-container  {
   display:flex;
@@ -113,12 +122,12 @@ const onOpenChange = openKeys => {
   );
   background-position: center;
   background-size: cover;
-  height: 100vh;
+  height: 90%;
   width: 100%;
 }
 
-.left-main-menu, .right-content{
-  flex: 1; /* 等分剩余空间 */
+.left-main-menu, .right-main-content{
+  flex: 1,9; /* 左右空间分配 */
 }
 
 .left-main-menu {
@@ -128,22 +137,13 @@ const onOpenChange = openKeys => {
   display: flex;
 }
 
-/* 导入字体 */
-@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;1,500&display=swap');
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: "poppins", sans-serif;
-}
-
 header {
   background: transparent;
   position: absolute;
+  z-index: 100; /* 确保导航栏在最上层 */
   top: 0;
   left: 0;
-  height: 70px;
+  height: 10%;
   width: 100%;
 }
 
