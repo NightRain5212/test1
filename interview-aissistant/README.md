@@ -1,5 +1,21 @@
-# Vue 3 + Vite
+# 大学生的面试助手
 
-This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+## 功能
+1. 采集面部特征和声音信息
+2. 生成个性化信息表
+3. 根据数据提出智能化建议
+4. 提供数据可视化界面
+5. 提供经典面试题目
 
-Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://vuejs.org/guide/scaling-up/tooling.html#ide-support).
+## 目标
+1. 帮助面试官一键搜集、整理、分析面试者信息
+2. 帮助大学生快速补充短板，提升面试技巧、缓解就业压力
+   
+## 技术栈
+
+## 特色
+1. 不矫揉造作，力求简洁实用
+
+## 运行
+npm install
+npm run dev
