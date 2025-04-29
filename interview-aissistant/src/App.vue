@@ -1,20 +1,20 @@
 <template>
-     <!-- 顶部导航栏 -->
-    <header>
-      <nav>
-        <div class="links-box">
-        </div>
-        <div @click="change_display_loginform" class="nav-login-box">
-          LOGIN
-        </div>
-      </nav>
-    </header>
-  <div class="main-container">
+  <div class="main-content">
     <div class="left-main-menu">
       <a-menu v-model:selectedKeys="state.selectedKeys" mode="inline" :open-keys="state.openKeys" :items="items"
         @openChange="onOpenChange"></a-menu>
     </div>
     <div class="right-main-content">
+      <!-- 顶部导航栏 -->
+      <header>
+        <nav>
+          <div class="links-box">
+          </div>
+          <div @click="change_display_loginform" class="nav-login-box">
+            LOGIN
+          </div>
+        </nav>
+      </header>
       <!-- 登陆表单界面 -->
       <div v-if="display_loginform" class="loginform-box">
         <form action="">
@@ -102,80 +102,80 @@ const onOpenChange = openKeys => {
 };
 
 </script>
-<style scoped>
+<style scoped lang="scss">/*使用scss,允许嵌套类*/
 /* 导入字体 */
 @import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;1,500&display=swap');
-* {
+/*处理布局*/
+.main-content {
   margin: 0;
   padding: 0;
+  height: 100vh;
+  width: 100vw;
   box-sizing: border-box;
-  font-family: "poppins", sans-serif;
+  font-family: "Poppins", sans-serif;
+  display: flex; /* 只需要写一次 */
 }
 
-.main-container  {
-  display:flex;
-  position: relative;
-  background: linear-gradient(
-    to right,
-    rgba(235, 65, 139, 0.833),
-    rgba(151, 40, 236, 0.84)
-  );
-  background-position: center;
-  background-size: cover;
-  height: 90%;
-  width: 100%;
+.left-main-menu {
+  flex: 2;  /* 占1份 */
 }
 
-.left-main-menu, .right-main-content{
-  flex: 1,9; /* 左右空间分配 */
+.right-main-content {
+  flex: 9;  /* 占9份 */
 }
 
 .left-main-menu {
   height: 100%;
   border-left: 0;
-  width: 20%;
   display: flex;
+  overflow: auto; /* 允许菜单滚动 */
 }
 
-header {
-  background: transparent;
-  position: absolute;
-  z-index: 100; /* 确保导航栏在最上层 */
-  top: 0;
-  left: 0;
-  height: 10%;
-  width: 100%;
-}
+.right-main-content {
+  position: relative;
+  background: linear-gradient(to right,
+      rgba(235, 65, 139, 0.833),
+      rgba(151, 40, 236, 0.84));
 
-header nav {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  height: 100%;
-  width: 100%;
-  background: rgba(255, 254, 254, 0.336);
-  user-select: none;
-}
+  header {
+    background: transparent;
+    position: absolute;
 
-header .links-box {
-  background: transparent;
-  width: 80%;
-  height: 100%;
-}
-
-header .nav-login-box {
-  display: flex;
-  background: transparent;
-  width: 20%;
-  height: 100%;
-  font-size: 30px;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-}
-
-header .nav-login-box:hover {
-  cursor: pointer;
+    top: 0;
+    height: 10%;
+    width: 100%;
+    
+    nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: 100%;
+      width: 100%;
+      background: rgba(255, 254, 254, 0.336);
+      user-select: none;
+    }
+  }
+  
+  .links-box {
+    background: transparent;
+    width: 80%;
+    height: 100%;
+  }
+  
+  .nav-login-box {
+    display: flex;
+    background: transparent;
+    width: 20%;
+    height: 100%;
+    font-size: 30px;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    
+    &:hover {/*&表示父元素*/
+      cursor: pointer;
+    }
+  }
 }
 
 .loginform-box {
