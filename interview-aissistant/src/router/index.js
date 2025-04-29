@@ -43,6 +43,11 @@ const router = createRouter({
 })
 //每个路由跳转前都会执行这个函数
 router.beforeEach((to, from, next) => {
+  if(!localStorage.getItem('token')){
+    if(to.meta.requiresAuth){//如果需要验证登录状态，并且没有token，那么就跳转到登录页面
+      next('/login')
+    }
+  }
   next()//进入下一个路由
 })
 

@@ -26,10 +26,8 @@ function getItem(label, key, icon, children, type) {
 }
 const items = reactive([
   getItem('主页', 'sub1', () => h(MailOutlined), [
-    getItem('Option 1', '1'),
-    getItem('Option 2', '2'),
-    getItem('Option 3', '3'),
-    getItem('Option 4', '4'),
+    getItem('录制', '1'),
+    getItem('分析', '2'),
   ]),
   getItem('历史', 'sub2', () => h(AppstoreOutlined), [
     getItem('Option 5', '5'),
@@ -49,7 +47,7 @@ const items = reactive([
   ]),
 ]);
 const state = reactive({
-  rootSubmenuKeys: ['sub1', 'sub2', 'sub4'],
+  rootSubmenuKeys: ['sub1', 'sub2', 'sub3','sub4'],
   openKeys: ['sub1'],
   selectedKeys: [],
 });
@@ -64,6 +62,7 @@ const onOpenChange = openKeys => {
 };
 
 </script>
+
 <style scoped lang="scss">/*使用scss,允许嵌套类*/
 /* 导入字体 */
 @import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;1,500&display=swap');

@@ -38,6 +38,7 @@
 <script setup>
 //登录
 import { ref } from 'vue';
+import axios from "../utils/axios";
 
 // 是否显示登陆界面
 const display_loginform = ref(false)
@@ -45,6 +46,28 @@ const display_loginform = ref(false)
 // 更新登陆界面状态
 const change_display_loginform = ()=> {
   display_loginform.value = ! display_loginform.value;
+}
+//用户输入用户名和密码，查询信息。并且支持自动注册。使用jwt双令牌来刷新token，结合本地存储用户信息
+async function login(username, password) {
+    //首先在本地查看是否存在该用户信息，如果存在，直接返回用户信息。
+    const access_token = localStorage.getItem('accesstoken');
+    const refresh_token = localStorage.getItem('refreshtoken');
+    //如果不存在，向服务器发送请求，查询用户信息。
+    if (!access_token) {
+        const res=await axios.get('/api/getuserinfo', {params: {username, password}});
+        if (res.status===200) {
+            //如果查询到用户信息，将用户信息存储到本地。
+            localStorage.setItem('accesstoken', res.data.accesstoken);
+            localStorage.setItem('refreshtoken', res.data.refreshtoken); 
+            localStorage.setItem('userinfo', res.data.userinfo);
+            return res.data.userinfo;
+        }
+        //如果查询不到用户信息，返回错误信息。
+       
+    } else if (token) {
+        //如果令牌没有过期，直接返回用户信息。
+        //否则刷新令牌，再次验证
+    }
 }
 </script>
 <style scoped lang="scss">
