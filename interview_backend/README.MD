@@ -1,10 +1,10 @@
 ## 数据库连接
 
-- aiven 数据库MySQL
+-  SQLPub数据库MySQL
 - 依赖：
 ```
 python -m pip install pymysql
-python -m pip install cryptography
+
 ```
 
 - users表单关键字
