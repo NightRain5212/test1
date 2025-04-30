@@ -9,3 +9,5 @@ app = FastAPI()
 # 路径操作函数，使用get访问/路径时被调用，异步函数节省时间
 async def root() :
     return {"message":"hello world!"}
+
+
