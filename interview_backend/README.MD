@@ -2,7 +2,7 @@
 
 - aiven 数据库MySQL
 - 依赖：
-```
+
 python -m pip install pymysql
 python -m pip install cryptography
 ```
