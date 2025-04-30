@@ -12,26 +12,27 @@
         </header>
         <!-- 登陆表单界面 -->
         <div v-if="display_loginform" class="loginform-box">
-            <form action="">
-                <div class="login-title">
-                    <h2>Login</h2>
-                </div>
+            <a-form :model="formState" name="basic" :label-col="{ span: 8 }" :wrapper-col="{ span: 16 }"
+                autocomplete="off" @finish="onFinish" @finishFailed="onFinishFailed">
 
-                <div class="input-box">
-                    <label for="username">用户名:</label>
-                    <input type="text" id="username">
-                </div>
+                <a-form-item label="Username" name="username"
+                    :rules="[{ required: true, message: '用户名为空!' }]">
+                    <a-input v-model:value="formState.username" aria-placeholder="请输入用户名" />
+                </a-form-item>
 
-                <div class="input-box">
-                    <label for="password">密码:</label>
-                    <input type="password" id="password">
-                </div>
+                <a-form-item label="Password" name="password"
+                    :rules="[{ required: true, message: '密码为空!' }]">
+                    <a-input-password v-model:value="formState.password" aria-placeholder="请输入密码" />
+                </a-form-item>
 
-                <div class="login-btn-box">
-                    <button class="login-btn">Login</button>
-                    <p><a href="#">To Sign up</a></p>
-                </div>
-            </form>
+                <a-form-item name="remember" :wrapper-col="{ offset: 8, span: 16 }">
+                    <a-checkbox v-model:checked="formState.remember">记住我</a-checkbox>
+                </a-form-item>
+
+                <a-form-item :wrapper-col="{ offset: 8, span: 16 }">
+                    <a-button type="primary" html-type="submit" @click="login(formState)">登录</a-button>
+                </a-form-item>
+            </a-form>
         </div>
     </div>
 </template>
@@ -39,11 +40,23 @@
 import { ref } from 'vue';
 //登录
 import axios from "../utils/axios";
-import route from "../router";
+import { useRouter } from 'vue-router'
+const route = useRouter() // 获取全局路由实例，一个app只有一个route实例
 import{message} from "ant-design-vue";
 // 是否显示登陆界面
 const display_loginform = ref(false)
-
+import { reactive } from 'vue';
+const formState = reactive({
+  username: '',
+  password: '',
+  remember: true,
+});
+const onFinish = values => {
+  console.log('Success:', values);
+};
+const onFinishFailed = errorInfo => {
+  console.log('Failed:', errorInfo);
+};
 // 更新登陆界面状态
 const change_display_loginform = () => {
     display_loginform.value = !display_loginform.value;
@@ -224,7 +237,7 @@ header {
     top: 50%;
     left: 50%;
     width: 30%;
-    height: 380px;
+    height: 40%;
     transform: translate(-50%, -50%);
     background: #fff;
     display: flex;
