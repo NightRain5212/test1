@@ -44,31 +44,121 @@ import axios from "../utils/axios";
 const display_loginform = ref(false)
 
 // 更新登陆界面状态
-const change_display_loginform = ()=> {
-  display_loginform.value = ! display_loginform.value;
+const change_display_loginform = () => {
+    display_loginform.value = !display_loginform.value;
 }
-//用户输入用户名和密码，查询信息。并且支持自动注册。使用jwt双令牌来刷新token，结合本地存储用户信息
-async function login(username, password) {
-    //首先在本地查看是否存在该用户信息，如果存在，直接返回用户信息。
-    const access_token = localStorage.getItem('accesstoken');
-    const refresh_token = localStorage.getItem('refreshtoken');
-    //如果不存在，向服务器发送请求，查询用户信息。
-    if (!access_token) {
-        const res=await axios.get('/api/getuserinfo', {params: {username, password}});
-        if (res.status===200) {
-            //如果查询到用户信息，将用户信息存储到本地。
-            localStorage.setItem('accesstoken', res.data.accesstoken);
-            localStorage.setItem('refreshtoken', res.data.refreshtoken); 
-            localStorage.setItem('userinfo', res.data.userinfo);
-            return res.data.userinfo;
+// 登录函数（含JWT双令牌处理）
+async function login(input_info) {
+    if (input_info.username === '' || input_info.password === '') {
+        return { message: '用户名或密码不能为空', code: 0 };
+    }
+
+    try {
+        // 1. 验证用户是否存在
+        const res = await axios.post('/api/user/get_info', { 
+            username: input_info.username 
+        });
+
+        if (!res.data) {
+            hint('该用户不存在，是否注册？');
+            return { message: '该用户未注册', code: 404 };
         }
-        //如果查询不到用户信息，返回错误信息。
-       
-    } else if (token) {
-        //如果令牌没有过期，直接返回用户信息。
-        //否则刷新令牌，再次验证
+
+        // 2. 验证密码
+        if (input_info.password !== res.data.password) {
+            return { message: '密码错误', code: 401 };
+        }
+
+        // 3. 登录成功，获取双令牌
+        const tokenRes = await axios.post('/api/auth/login', {
+            username: input_info.username,
+            password: input_info.password
+        });
+
+        // 4. 存储令牌
+        localStorage.setItem('accessToken', tokenRes.data.accessToken);
+        localStorage.setItem('refreshToken', tokenRes.data.refreshToken);
+        
+        // 5. 启动令牌自动刷新
+        startTokenRefresh();
+
+        return { 
+            message: '欢迎回来！' + input_info.username, 
+            ...res.data,
+            code: 200 
+        };
+
+    } catch (error) {
+        console.error('登录失败:', error);
+        return { 
+            message: '登录服务异常', 
+            code: 500 
+        };
     }
 }
+
+// 令牌刷新函数（优化版）
+async function refreshTokens() {
+    const refreshToken = localStorage.getItem('refreshToken');
+    
+    if (!refreshToken) {
+        // 无有效refreshToken，跳转登录
+        window.location.href = '/login';
+        return;
+    }
+
+    try {
+        // 1. 用refreshToken获取新accessToken
+        const res = await axios.post('/api/auth/refresh', null, {
+            headers: {
+                'Authorization': `Bearer ${refreshToken}`
+            }
+        });
+
+        // 2. 更新本地令牌
+        localStorage.setItem('accessToken', res.data.accessToken);
+        
+        // 如果有新refreshToken也更新（可选）
+        if (res.data.refreshToken) {
+            localStorage.setItem('refreshToken', res.data.refreshToken);
+        }
+
+    } catch (error) {
+        if (error.response?.status === 401) {
+            // refreshToken已过期，强制重新登录
+            localStorage.clear();
+            window.location.href = '/login';
+        }
+    }
+}
+
+// 启动定时令牌刷新
+let refreshInterval;
+function startTokenRefresh() {
+    // 清除旧定时器
+    if (refreshInterval) clearInterval(refreshInterval);
+    
+    // 每5分钟检查一次（根据实际token有效期调整）
+    refreshInterval = setInterval(async () => {
+        const accessToken = localStorage.getItem('accessToken');
+        
+        // 如果accessToken不存在或已过期
+        if (!accessToken || isTokenExpired(accessToken)) {
+            await refreshTokens();
+        }
+    }, 5 * 60 * 1000); // 5分钟
+}
+
+// 检查token是否过期
+function isTokenExpired(token) {
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return payload.exp * 1000 < Date.now();
+    } catch {
+        return true;
+    }
+}
+
 </script>
 <style scoped lang="scss">
 .main-all {
