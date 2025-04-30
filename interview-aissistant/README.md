@@ -30,3 +30,6 @@ npm run dev
 
 ## 接口  
 
+- /api/auth/refresh  发送refresh_token获取新的access_token和refresh_token
+- /api/auth/login   注册登录用户信息列表
+- /api/user/get_info  根据提供的信息查询用户信息,这里现在只给username

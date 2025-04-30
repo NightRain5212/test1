@@ -36,10 +36,11 @@
     </div>
 </template>
 <script setup>
-//登录
 import { ref } from 'vue';
+//登录
 import axios from "../utils/axios";
-
+import route from "../router";
+import{message} from "ant-design-vue";
 // 是否显示登陆界面
 const display_loginform = ref(false)
 
@@ -50,22 +51,24 @@ const change_display_loginform = () => {
 // 登录函数（含JWT双令牌处理）
 async function login(input_info) {
     if (input_info.username === '' || input_info.password === '') {
+        message.info('用户名或密码不能为空');
         return { message: '用户名或密码不能为空', code: 0 };
     }
 
     try {
         // 1. 验证用户是否存在
-        const res = await axios.post('/api/user/get_info', { 
-            username: input_info.username 
+        const res = await axios.post('/api/user/get_info', {
+            username: input_info.username
         });
 
         if (!res.data) {
-            hint('该用户不存在，是否注册？');
-            return { message: '该用户未注册', code: 404 };
+            message.info('用户未注册');
+            return { message: '用户未注册', code: 404 };
         }
 
         // 2. 验证密码
         if (input_info.password !== res.data.password) {
+            message.error('密码错误');
             return { message: '密码错误', code: 401 };
         }
 
@@ -78,37 +81,39 @@ async function login(input_info) {
         // 4. 存储令牌
         localStorage.setItem('accessToken', tokenRes.data.accessToken);
         localStorage.setItem('refreshToken', tokenRes.data.refreshToken);
-        
+
         // 5. 启动令牌自动刷新
         startTokenRefresh();
-
-        return { 
-            message: '欢迎回来！' + input_info.username, 
+        message.success('欢迎回来！' + input_info.username);
+        return {
+            message: '登录成功',
             ...res.data,
-            code: 200 
+            code: 200
         };
 
     } catch (error) {
-        console.error('登录失败:', error);
-        return { 
-            message: '登录服务异常', 
-            code: 500 
+        message.error('登录失败');
+        return {
+            message: '登录服务异常',
+            code: 500
         };
     }
 }
 
-// 令牌刷新函数（优化版）
+// accessToken令牌刷新函数
 async function refreshTokens() {
     const refreshToken = localStorage.getItem('refreshToken');
-    
+
     if (!refreshToken) {
         // 无有效refreshToken，跳转登录
-        window.location.href = '/login';
+        // window.location.href = '/login';
+        route.push('/login');
         return;
     }
 
     try {
         // 1. 用refreshToken获取新accessToken
+        //第二个参数是请求体,第三个参数是配置，这里设置请求头
         const res = await axios.post('/api/auth/refresh', null, {
             headers: {
                 'Authorization': `Bearer ${refreshToken}`
@@ -117,17 +122,18 @@ async function refreshTokens() {
 
         // 2. 更新本地令牌
         localStorage.setItem('accessToken', res.data.accessToken);
-        
-        // 如果有新refreshToken也更新（可选）
+
+        // 3. 重新发起之前的请求（如果有）
         if (res.data.refreshToken) {
             localStorage.setItem('refreshToken', res.data.refreshToken);
         }
 
     } catch (error) {
-        if (error.response?.status === 401) {
-            // refreshToken已过期，强制重新登录
+        if (error.response?.status === 401) { // 可选链操作符避免报错,等价于error.response && error.response.status === 401
             localStorage.clear();
-            window.location.href = '/login';
+            route.push('/login');
+        } else {
+            console.error('非HTTP错误:', error.message);
         }
     }
 }
@@ -137,11 +143,11 @@ let refreshInterval;
 function startTokenRefresh() {
     // 清除旧定时器
     if (refreshInterval) clearInterval(refreshInterval);
-    
-    // 每5分钟检查一次（根据实际token有效期调整）
+
+    // 每5分钟检查一次（根据实际token有效期调整）,setInterval是内置函数，接收两个参数，第一个是要执行的函数，第二个是执行时间间隔
     refreshInterval = setInterval(async () => {
         const accessToken = localStorage.getItem('accessToken');
-        
+
         // 如果accessToken不存在或已过期
         if (!accessToken || isTokenExpired(accessToken)) {
             await refreshTokens();
@@ -152,8 +158,8 @@ function startTokenRefresh() {
 // 检查token是否过期
 function isTokenExpired(token) {
     try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        return payload.exp * 1000 < Date.now();
+        const payload = JSON.parse(atob(token.split('.')[1]));//jwt令牌分为三个部分,header,paylod(存放实际数据),signature(加密)
+        return payload.exp * 1000 < Date.now();//payload.exp实际上是截止时间，以毫秒为单位
     } catch {
         return true;
     }
@@ -164,9 +170,9 @@ function isTokenExpired(token) {
 .main-all {
     height: 100vh;
     width: 100%;
-    padding:0px;
-    margin:0px;
-    position: relative;//相对定位
+    padding: 0px;
+    margin: 0px;
+    position: relative; //相对定位
     background: linear-gradient(to right,
             rgba(235, 65, 139, 0.833),
             rgba(151, 40, 236, 0.84));
@@ -178,6 +184,7 @@ header {
     top: 0;
     height: 10%;
     width: 100%;
+
     nav {
         display: flex;
         justify-content: space-between;
@@ -210,6 +217,7 @@ header {
         cursor: pointer;
     }
 }
+
 .loginform-box {
     position: absolute;
     padding: 20px;
