@@ -3,8 +3,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 const routes = [
   {
     path: '/',
-    name: 'Home',//命名，home就可以代指url路径了
-    component: () => import('../views/Home.vue'),
+    name: 'homeView',//命名，home就可以代指url路径了
+    component: () => import('../views/HomeView.vue'),
     meta: { requiresAuth: true }
   },
   {
