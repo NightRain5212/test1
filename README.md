@@ -1,8 +1,11 @@
+# 开发者文档
+
 ## 前端
 
 - 运行
 - npm install
 - npm run dev
+- 
 - push前（如果安装了新的东西忘记使用--save）
 - npm list,然后把输出结果和 package.json 一起提交给ai处理
 
