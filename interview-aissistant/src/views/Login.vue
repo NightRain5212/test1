@@ -12,27 +12,21 @@
         </header>
         <!-- 登陆表单界面 -->
         <div v-if="display_loginform" class="loginform-box">
-            <a-form :model="formState" name="basic" :label-col="{ span: 8 }" :wrapper-col="{ span: 16 }"
-                autocomplete="off" @finish="onFinish" @finishFailed="onFinishFailed">
+            <form action="">
+                <div class="input-box">
+                    <label for="username">用户名:</label>
+                    <input type="text" id="username" placeholder="请输入4-30位用户名" v-model=input_info.username>
+                </div>
 
-                <a-form-item label="Username" name="username"
-                    :rules="[{ required: true, message: '用户名为空!' }]">
-                    <a-input v-model:value="formState.username" aria-placeholder="请输入用户名" />
-                </a-form-item>
+                <div class="input-box">
+                    <label for="password">密码:</label>
+                    <input type="password" id="password" placeholder="请输入8-12位密码" v-model=input_info.password>
+                </div>
 
-                <a-form-item label="Password" name="password"
-                    :rules="[{ required: true, message: '密码为空!' }]">
-                    <a-input-password v-model:value="formState.password" aria-placeholder="请输入密码" />
-                </a-form-item>
-
-                <a-form-item name="remember" :wrapper-col="{ offset: 8, span: 16 }">
-                    <a-checkbox v-model:checked="formState.remember">记住我</a-checkbox>
-                </a-form-item>
-
-                <a-form-item :wrapper-col="{ offset: 8, span: 16 }">
-                    <a-button type="primary" html-type="submit" @click="login(formState)">登录</a-button>
-                </a-form-item>
-            </a-form>
+                <div class="login-btn-box">
+                    <button class="login-btn" @click="login(input_info)">Login</button>
+                </div>
+            </form>
         </div>
     </div>
 </template>
@@ -42,21 +36,14 @@ import { ref } from 'vue';
 import axios from "../utils/axios";
 import { useRouter } from 'vue-router'
 const route = useRouter() // 获取全局路由实例，一个app只有一个route实例
-import{message} from "ant-design-vue";
+import{Modal,message} from "ant-design-vue";
+const input_info = ref({
+    username: '',
+    password: '',
+    email: ''
+})
 // 是否显示登陆界面
 const display_loginform = ref(false)
-import { reactive } from 'vue';
-const formState = reactive({
-  username: '',
-  password: '',
-  remember: true,
-});
-const onFinish = values => {
-  console.log('Success:', values);
-};
-const onFinishFailed = errorInfo => {
-  console.log('Failed:', errorInfo);
-};
 // 更新登陆界面状态
 const change_display_loginform = () => {
     display_loginform.value = !display_loginform.value;
@@ -75,8 +62,20 @@ async function login(input_info) {
         });
 
         if (!res.data) {
-            message.info('用户未注册');
-            return { message: '用户未注册', code: 404 };
+            message.error('用户不存在');
+            Modal.confirm({
+                title: '用户未注册',
+                content: '该用户未注册，是否立即注册？',
+                okText: '是',
+                cancelText: '否',
+                onOk() {
+                    register(); // 调用你的注册函数
+                },
+                onCancel() {
+                    message.info('已取消注册');
+                },
+            });
+            return;
         }
 
         // 2. 验证密码
@@ -177,7 +176,28 @@ function isTokenExpired(token) {
         return true;
     }
 }
+async function register(input_info) {
+    try {
+        const res = await axios.post('/api/auth/register', {
+            ...input_info
+        })
 
+        // 2. 存储令牌
+        localStorage.setItem('accessToken', res.data.accessToken);
+        localStorage.setItem('refreshToken', res.data.refreshToken);
+
+        // 3. 启动令牌自动刷新
+        startTokenRefresh();
+        message.success('欢迎！' + input_info.username);
+        return {
+            message: '注册成功',
+            ...res.data,
+            code: 200
+        };
+    } catch (error) {
+        message.error('注册失败');
+    }
+}
 </script>
 <style scoped lang="scss">
 .main-all {
@@ -236,24 +256,13 @@ header {
     padding: 20px;
     top: 50%;
     left: 50%;
-    width: 30%;
-    height: 40%;
+    width: 400px;
+    height: 300px;
     transform: translate(-50%, -50%);
     background: #fff;
     display: flex;
     flex-direction: column;
     border-radius: 15px;
-}
-
-.loginform-box .login-title {
-    margin-top: 0px;
-    background: transparent;
-    text-align: center;
-    margin-bottom: 10px;
-    height: 70px;
-    line-height: 70px;
-    font-size: large;
-    font-weight: bolder;
 }
 
 .input-box {
