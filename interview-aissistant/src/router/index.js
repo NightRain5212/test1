@@ -1,35 +1,18 @@
+
 import { createRouter, createWebHistory } from 'vue-router'
 
 const routes = [
   {
     path: '/',
-    name: 'home',//命名，home就可以代指url路径了
+    name: 'homeView',//命名，home就可以代指url路径了
     component: () => import('../views/HomeView.vue'),
-    meta: { requiresAuth: false }
+    meta: { requiresAuth: true }
   },
   {
     path: '/login',
     name: 'login',
     component: () => import('../views/Login.vue'),
     meta: { requiresAuth: false }
-  },
-  {
-    path: '/history',
-    name: 'home',
-    component: () => import('../views/HistoryView.vue'),
-    meta: { requiresAuth: true }
-  },
-  {
-    path: '/settings',
-    name: 'login',
-    component: () => import('../views/Settings.vue'),
-    meta: { requiresAuth: true }
-  },
-  {
-    path: '/about',
-    name: 'about',
-    component: () => import('../views/AboutView.vue'),
-    meta: { requiresAuth: true }
   }
 ]
 

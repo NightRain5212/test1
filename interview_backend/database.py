@@ -509,8 +509,6 @@ def isactive(username):
         if connection:
           connection.close()
 
-
-
 def user_info(username):
     '''
     查询用户信息\n
