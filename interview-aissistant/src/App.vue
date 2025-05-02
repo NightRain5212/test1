@@ -4,6 +4,11 @@
       <a-menu v-model:selectedKeys="state.selectedKeys" mode="inline" :open-keys="state.openKeys" :items="items"
         @openChange="onOpenChange"></a-menu>
     </div>
+    <div v-if="state.selectedKeys[0]=='1.1'">
+      <routeLink to="/views/HomeView.vue">
+        <router-view></router-view>
+      </routeLink>
+    </div>
     <div class="right-main-content">
       <login></login>
     </div>
@@ -26,8 +31,8 @@ function getItem(label, key, icon, children, type) {
 }
 const items = reactive([
   getItem('主页', 'sub1', () => h(MailOutlined), [
-    getItem('录制', '1'),
-    getItem('分析', '2'),
+    getItem('开始', '1.1'),
+    getItem('报告', '1.2'),
   ]),
   getItem('历史', 'sub2', () => h(AppstoreOutlined), [
     getItem('Option 5', '5'),
@@ -37,7 +42,7 @@ const items = reactive([
     getItem('设置', 'sub3', () => h(AppstoreOutlined), [
     getItem('Option 5', '5'),
     getItem('Option 6', '6'),
-    getItem('Submenu', 'sub3', null, [getItem('Option 7', '7'), getItem('Option 8', '8')]),
+    getItem('Submenu', 'sub6', null, [getItem('Option 7', '7'), getItem('Option 8', '8')]),
   ]),
   getItem('关于我们', 'sub4', () => h(SettingOutlined), [
     getItem('Option 9', '9'),

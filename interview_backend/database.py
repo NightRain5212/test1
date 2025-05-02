@@ -1,568 +1,140 @@
-import pymysql,dotenv,os,re
-from datetime import date
 
-# 加载环境变量
-dotenv.load_dotenv()
-DB_HOST = os.getenv("DB_HOST")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_PORT = os.getenv("DB_PORT")
-DB_USER = os.getenv("DB_USER")
-DB_NAME = os.getenv("DB_NAME")
-
-timeout = 20
-
-# # 连接数据库
-# try:
-#     # 获取一个数据库操作游标
-#     cursor = connection.cursor()
-#     cursor.execute("SELECT VERSION()")
-#     result = cursor.fetchone()
-#     print(result)
-# finally:
-#   cursor.close()
-#   connection.close()
-
-
-def is_valid_email(email):
-    """
-    验证邮箱格式是否正确
-    """
-    email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return re.match(email_regex, email) is not None
-
-
-def is_valid_password(password):
-    """
-    验证密码是否不少于6位且包含至少一个字母
-    """
-    
-    # 检查密码是否至少6位
-    if len(password) < 6:
-        return False
-    
-    # 使用正则表达式检查密码是否包含至少一个字母
-    if not re.search(r'[a-zA-Z]', password):
-        return False
-    
-    return True
-
-# 创建用户
-def create_user(username,password,email,is_active = False):
-    '''
-    用于在数据库创建用户\n
-    @params：\n
-    @username 用户名\n
-    @password 密码\n
-    @email 邮箱\n
-    @is_active 是否激活\n
-    @return:\n
-    @0 成功创建\n
-    @1 意外错误\n
-    @2 用户已存在\n
-    @3 邮箱不合法\n
-    @4 密码不合法\n
-    '''
-    connection = None
-    cursor = None
-    # 检查参数合法
-    if(not is_valid_email(email)):
-        return 3
-    if(not is_valid_password(password)):
-        return 4
-
-    try:
-      # 建立连接实例
-      connection = pymysql.connect(
-        charset="utf8mb4",
-        connect_timeout=timeout,
-        cursorclass=pymysql.cursors.DictCursor,
-        db=DB_NAME,
-        host= DB_HOST,
-        password=DB_PASSWORD,
-        read_timeout=timeout,
-        port=int(DB_PORT),
-        user=DB_USER,
-        write_timeout=timeout,
-      )
+import pymysql
+import dotenv
+import os
+from typing import Dict, List, Optional, Union
+#数据库：username/password/email/created_data(data类型)
+class DatabaseManager:
+    def __init__(self):
+        """初始化数据库连接"""
+        dotenv.load_dotenv()
+        self.DB_HOST = os.getenv("DB_HOST")
+        self.DB_PASSWORD = os.getenv("DB_PASSWORD")
+        self.DB_PORT = os.getenv("DB_PORT")
+        self.DB_USER = os.getenv("DB_USER")
+        self.DB_NAME = "users"  # 可以改为从环境变量读取
+        self.timeout = 20
         
-      cursor = connection.cursor()
+        self.connection = None
+        self.connect()
 
-      # 检查用户名是否已存在
-      cursor.execute("SELECT COUNT(*) FROM users WHERE username = %s", (username,))
-      result = cursor.fetchone()
-      print(f"查询结果: {result}")
+    def connect(self):
+        """建立数据库连接"""
+        try:
+            self.connection = pymysql.connect(
+                charset="utf8mb4",
+                connect_timeout=self.timeout,
+                cursorclass=pymysql.cursors.DictCursor,
+                db=self.DB_NAME,
+                host=self.DB_HOST,
+                password=self.DB_PASSWORD,
+                read_timeout=self.timeout,
+                port=int(self.DB_PORT),
+                user=self.DB_USER,
+                write_timeout=self.timeout,
+            )
+            print("Database connection established")
+        except pymysql.MySQLError as e:
+            print(f"Error connecting to MySQL: {e}")
+            raise
 
-      # 确保查询结果是一个字典，且包含 'COUNT(*)' 键
-      if result and 'COUNT(*)' in result:
-          count = result['COUNT(*)']  # 获取 COUNT(*) 的结果
-      else:
-          print("查询结果不合法，返回的不是预期的格式")
-          return 1
+    def close(self):
+        """关闭数据库连接"""
+        if self.connection:
+            self.connection.close()
+            print("Database connection closed")
 
-      if count > 0:
-          # 如果用户名已存在，抛出错误
-          print(f"错误: 用户名 '{username}' 已存在！")
-          return 2
-      
-      # 获取日期
-      createdate = date.today()
-      # 插入语句
-      sql = '''
-            INSERT INTO `users` (username,password,email,is_active,created_date)
-            VALUES (%s,%s,%s,%s,%s)
-            '''
-      # 执行
-      cursor.execute(sql,(username,password,email,is_active,createdate))
-      # 提交事务
-      connection.commit()
-      print(f"用户{username}创建成功！")
-      cursor.close()
-      return 0
-    except pymysql.MySQLError as e:
-       cursor.close()
-       print(f"报错{e}")
-       return 1
-    finally:
-        if cursor:
-          cursor.close()
-        if connection:
-          connection.close()
-
-# 删除用户
-def delete_user(username):
-    '''
-    用于在数据库删除用户\n
-    @params：\n
-    @username 用户名\n
-    @return:\n
-    @0 成功删除\n
-    @1 意外错误\n
-    @2 用户不存在\n
-    '''
-    connection = None
-    cursor = None
-    try:
-        # 建立连接实例
-        connection = pymysql.connect(
-          charset="utf8mb4",
-          connect_timeout=timeout,
-          cursorclass=pymysql.cursors.DictCursor,
-          db=DB_NAME,
-          host= DB_HOST,
-          password=DB_PASSWORD,
-          read_timeout=timeout,
-          port=int(DB_PORT),
-          user=DB_USER,
-          write_timeout=timeout,
-        )
-          
-        cursor = connection.cursor()
-
-        # 检查用户是否存在
-        cursor.execute("SELECT COUNT(*) FROM users WHERE username = %s", (username,))
-        result = cursor.fetchone()
-
-        if result and result['COUNT(*)'] == 0:
-            print(f"错误: 用户 '{username}' 不存在！")
-            return 2
-        
-        # 删除用户
-        cursor.execute("DELETE FROM users WHERE username = %s", (username,))
-
-        # 提交事务到数据库
-        connection.commit()
-
-        print(f"用户 '{username}' 已成功删除！")
-        return 0
-    except pymysql.MySQLError as e:
-        print(f"报错{e}")
-        return 1
-    finally:
-        if cursor:
-          cursor.close()
-        if connection:
-          connection.close()
-
-def update_user_password(username,password):
-    '''
-    用于更新用户密码：\n
-    @params：\n
-    @username 用户名\n
-    @password 密码\n
-    @email 邮箱\n
-    @return:\n
-    @0 成功更新\n
-    @1 意外错误\n
-    @2 用户不存在\n
-    @3 密码不合法\n
-    '''
-    connection = None
-    cursor = None
-    # 检查参数合法
-    if(not is_valid_password(password)):
-        return 3
-
-    try:
-        # 建立连接实例
-        connection = pymysql.connect(
-          charset="utf8mb4",
-          connect_timeout=timeout,
-          cursorclass=pymysql.cursors.DictCursor,
-          db=DB_NAME,
-          host= DB_HOST,
-          password=DB_PASSWORD,
-          read_timeout=timeout,
-          port=int(DB_PORT),
-          user=DB_USER,
-          write_timeout=timeout,
-        )
-          
-        cursor = connection.cursor()
-        # 检查用户是否存在
-        cursor.execute("SELECT COUNT(*) FROM users WHERE username = %s", (username,))
-        result = cursor.fetchone()
-
-        if result and result['COUNT(*)'] == 0:
-            print(f"错误: 用户 '{username}' 不存在！")
-            return 2
-        
-        # 更新用户信息
-        sql = """
-        UPDATE users
-        SET password = %s
-        WHERE username = %s
+    def execute_query(self, query: str, params: Optional[tuple] = None) -> List[Dict]:
         """
-        
-        cursor.execute(sql, (password, username))
-
-        # 提交事务到数据库
-        connection.commit()
-        print(f"用户 '{username}' 的信息已成功更新！")
-        return 0
-    
-    except pymysql.MySQLError as e:
-        print( f"数据库错误: {e}")  # 数据库错误
-        return 1
-
-    finally:
-        # 关闭游标和连接
-        if cursor:
-          cursor.close()
-        if connection:
-          connection.close()
-
-def update_user_email(username,email):
-    '''
-    用于更新用户邮箱：\n
-    @params：\n
-    @username 用户名\n
-    @password 密码\n
-    @email 邮箱\n
-    @return:\n
-    @0 成功更新\n
-    @1 意外错误\n
-    @2 用户不存在\n
-    @3 邮箱不合法\n
-    '''
-    connection = None
-    cursor = None
-    # 检查参数合法
-    if(not is_valid_email(email)):
-        return 3
-
-    try:
-        # 建立连接实例
-        connection = pymysql.connect(
-          charset="utf8mb4",
-          connect_timeout=timeout,
-          cursorclass=pymysql.cursors.DictCursor,
-          db=DB_NAME,
-          host= DB_HOST,
-          password=DB_PASSWORD,
-          read_timeout=timeout,
-          port=int(DB_PORT),
-          user=DB_USER,
-          write_timeout=timeout,
-        )
-          
-        cursor = connection.cursor()
-        # 检查用户是否存在
-        cursor.execute("SELECT COUNT(*) FROM users WHERE username = %s", (username,))
-        result = cursor.fetchone()
-
-        if result and result['COUNT(*)'] == 0:
-            print(f"错误: 用户 '{username}' 不存在！")
-            return 2
-        
-        # 更新用户信息
-        sql = """
-        UPDATE users
-        SET email = %s
-        WHERE username = %s
+        执行查询操作（SELECT）
+        :param query: SQL查询语句
+        :param params: 查询参数
+        :return: 查询结果列表
         """
-        
-        cursor.execute(sql, (email, username))
+        try:
+            with self.connection.cursor() as cursor:
+                cursor.execute(query, params or ())
+                result = cursor.fetchall()
+                return result
+        except pymysql.MySQLError as e:
+            print(f"Error executing query: {e}")
+            raise
 
-        # 提交事务到数据库
-        connection.commit()
-        print(f"用户 '{username}' 的信息已成功更新！")
-        return 0
-    
-    except pymysql.MySQLError as e:
-        print( f"数据库错误: {e}")  # 数据库错误
-        return 1
-
-    finally:
-        # 关闭游标和连接
-        if cursor:
-          cursor.close()
-        if connection:
-          connection.close()
-
-def activate_user(username):
-    '''
-    用于激活账户\n
-    @params：\n
-    @username 用户名\n
-    @return:\n
-    @0 成功更新\n
-    @1 意外错误\n
-    @2 用户不存在\n
-    '''
-    connection = None
-    cursor = None
-
-    try:
-        # 建立连接实例
-        connection = pymysql.connect(
-          charset="utf8mb4",
-          connect_timeout=timeout,
-          cursorclass=pymysql.cursors.DictCursor,
-          db=DB_NAME,
-          host= DB_HOST,
-          password=DB_PASSWORD,
-          read_timeout=timeout,
-          port=int(DB_PORT),
-          user=DB_USER,
-          write_timeout=timeout,
-        )
-          
-        cursor = connection.cursor()
-        # 检查用户是否存在
-        cursor.execute("SELECT COUNT(*) FROM users WHERE username = %s", (username,))
-        result = cursor.fetchone()
-
-        if result and result['COUNT(*)'] == 0:
-            print(f"错误: 用户 '{username}' 不存在！")
-            return 2
-        
-        # 更新用户信息
-        sql = """
-        UPDATE users
-        SET is_active = true
-        WHERE username = %s
+    def execute_update(self, query: str, params: Optional[tuple] = None) -> int:
         """
-        
-        cursor.execute(sql, (username))
-
-        # 提交事务到数据库
-        connection.commit()
-        print(f"用户 '{username}' 的信息已成功更新！")
-        return 0
-    
-    except pymysql.MySQLError as e:
-        print( f"数据库错误: {e}")  # 数据库错误
-        return 1
-
-    finally:
-        # 关闭游标和连接
-        if cursor:
-          cursor.close()
-        if connection:
-          connection.close()
-
-def freeze_user(username):
-    '''
-    冻结用户\n
-    @params：\n
-    @username 用户名\n
-    @return:\n
-    @0 成功更新\n
-    @1 意外错误\n
-    @2 用户不存在\n
-    '''
-    connection = None
-    cursor = None
-
-    try:
-        # 建立连接实例
-        connection = pymysql.connect(
-          charset="utf8mb4",
-          connect_timeout=timeout,
-          cursorclass=pymysql.cursors.DictCursor,
-          db=DB_NAME,
-          host= DB_HOST,
-          password=DB_PASSWORD,
-          read_timeout=timeout,
-          port=int(DB_PORT),
-          user=DB_USER,
-          write_timeout=timeout,
-        )
-          
-        cursor = connection.cursor()
-        # 检查用户是否存在
-        cursor.execute("SELECT COUNT(*) FROM users WHERE username = %s", (username,))
-        result = cursor.fetchone()
-
-        if result and result['COUNT(*)'] == 0:
-            print(f"错误: 用户 '{username}' 不存在！")
-            return 2
-        
-        # 更新用户信息
-        sql = """
-        UPDATE users
-        SET is_active = false
-        WHERE username = %s
+        执行更新操作（INSERT/UPDATE/DELETE）
+        :param query: SQL语句
+        :param params: 参数
+        :return: 受影响的行数
         """
-        
-        cursor.execute(sql, (username))
+        try:
+            with self.connection.cursor() as cursor:
+                affected_rows = cursor.execute(query, params or ())
+                self.connection.commit()
+                return affected_rows
+        except pymysql.MySQLError as e:
+            self.connection.rollback()
+            print(f"Error executing update: {e}")
+            raise
 
-        # 提交事务到数据库
-        connection.commit()
-        print(f"用户 '{username}' 的信息已成功更新！")
-        return 0
-    
-    except pymysql.MySQLError as e:
-        print( f"数据库错误: {e}")  # 数据库错误
-        return 1
-
-    finally:
-        # 关闭游标和连接
-        if cursor:
-          cursor.close()
-        if connection:
-          connection.close()
-
-def isactive(username):
-    '''
-    返回用户是否激活
-    用于激活账户\n
-    @params：\n
-    @username 用户名\n
-    @return:\n
-    @0 冻结状态\n
-    @1 激活状态\n
-    @2 用户不存在\n
-    @3 意外错误\n
-
-    '''
-    connection = None
-    cursor = None
-
-    try:
-        # 建立连接实例
-        connection = pymysql.connect(
-          charset="utf8mb4",
-          connect_timeout=timeout,
-          cursorclass=pymysql.cursors.DictCursor,
-          db=DB_NAME,
-          host= DB_HOST,
-          password=DB_PASSWORD,
-          read_timeout=timeout,
-          port=int(DB_PORT),
-          user=DB_USER,
-          write_timeout=timeout,
-        )
-          
-        cursor = connection.cursor()
-        # 检查用户是否存在
-        cursor.execute("SELECT COUNT(*) FROM users WHERE username = %s", (username,))
-        result = cursor.fetchone()
-
-        if result and result['COUNT(*)'] == 0:
-            print(f"错误: 用户 '{username}' 不存在！")
-            return 2
-        
-        # 更新用户信息
-        sql = """
-        SELECT is_active
-        FROM users
-        WHERE username = %s
+    # 以下是具体的CRUD操作方法
+    def insert(self, table: str, data: Dict) -> int:
         """
-        
-        cursor.execute(sql, (username))
-        user_data = cursor.fetchone()
+        插入数据
+        :param table: 表名
+        :param data: 要插入的数据字典 {列名: 值}
+        :return: 受影响的行数
+        """
+        columns = ", ".join(data.keys())
+        placeholders = ", ".join(["%s"] * len(data))
+        query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
+        return self.execute_update(query, tuple(data.values()))
 
-        if user_data:
-            # 返回用户是否激活状态
-            return user_data['is_active']  # 如果返回的是 1，则代表激活，0 则代表未激活
+    def select(self, table: str, columns: List[str] = ["*"], where: Optional[str] = None, 
+               params: Optional[tuple] = None) -> List[Dict]:
+        """
+        查询数据
+        :param table: 表名
+        :param columns: 要查询的列名列表
+        :param where: WHERE条件语句
+        :param params: WHERE条件参数
+        :return: 查询结果列表
+        """
+        columns_str = ", ".join(columns)
+        query = f"SELECT {columns_str} FROM {table}"
+        if where:
+            query += f" WHERE {where}"
+        return self.execute_query(query, params)
 
-    
-    except pymysql.MySQLError as e:
-        print( f"数据库错误: {e}")  # 数据库错误
-        return 3
+    def update(self, table: str, data: Dict, where: str, params: Optional[tuple] = None) -> int:
+        """
+        更新数据
+        :param table: 表名
+        :param data: 要更新的数据字典 {列名: 新值}
+        :param where: WHERE条件语句
+        :param params: WHERE条件参数
+        :return: 受影响的行数
+        """
+        set_clause = ", ".join([f"{key} = %s" for key in data.keys()])
+        query = f"UPDATE {table} SET {set_clause} WHERE {where}"
+        return self.execute_update(query, tuple(data.values()) + (params or ()))
 
-    finally:
-        # 关闭游标和连接
-        if cursor:
-          cursor.close()
-        if connection:
-          connection.close()
+    def delete(self, table: str, where: str, params: Optional[tuple] = None) -> int:
+        """
+        删除数据
+        :param table: 表名
+        :param where: WHERE条件语句
+        :param params: WHERE条件参数
+        :return: 受影响的行数
+        """
+        query = f"DELETE FROM {table} WHERE {where}"
+        return self.execute_update(query, params)
 
-def user_info(username):
-    '''
-    查询用户信息\n
-    @params：\n
-    @username 用户名\n
-    @return:\n
-    @user_data 类型：dict \n
-    @1 意外错误\n
-    @2 用户不存在\n
-    '''
-    connection = None
-    cursor = None
-    try:
-      # 建立连接实例
-      connection = pymysql.connect(
-        charset="utf8mb4",
-        connect_timeout=timeout,
-        cursorclass=pymysql.cursors.DictCursor,
-        db=DB_NAME,
-        host= DB_HOST,
-        password=DB_PASSWORD,
-        read_timeout=timeout,
-        port=int(DB_PORT),
-        user=DB_USER,
-        write_timeout=timeout,
-      )
-        
-      cursor = connection.cursor()
-      # 检查用户是否存在
-      cursor.execute("SELECT COUNT(*) FROM users WHERE username = %s", (username,))
-      result = cursor.fetchone()
+    def __enter__(self):
+        """支持with语句"""
+        return self
 
-      if result and result['COUNT(*)'] == 0:
-          print(f"错误: 用户 '{username}' 不存在！")
-          return 2
-      
-      # 查询并返回用户的详细信息
-      cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
-      user_data = cursor.fetchone()
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """支持with语句"""
+        self.close()
 
-      if user_data:
-          # 返回用户信息字典
-          return user_data
-
-
-    except pymysql.MySQLError as e:
-      print( f"数据库错误: {e}")  # 数据库错误
-      return 1
-
-    finally:
-        # 关闭游标和连接
-        if cursor:
-          cursor.close()
-        if connection:
-          connection.close()
-
-print(create_user("123","a1234567","111@qq.com"))

@@ -1,2 +1,3 @@
 # 忽略.env
 .env
+myvenv/

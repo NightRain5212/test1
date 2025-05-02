@@ -1,0 +1,11 @@
+# MySQL 数据库连接
+pymysql==1.1.1  
+# 加密库（pymysql 的可选依赖，用于安全连接）
+cryptography== 43.0.0 
+#核心框架
+fastapi== 0.115.12
+fastapi-cli== 0.0.7
+#python处理哈希的库
+passlib==1.7.4
+#jwt相关
+python-jose== 3.4.0
