@@ -1,7 +1,7 @@
-import pymysql
-import dotenv
-import os
-from typing import Dict, List, Optional, Union
+import pymysql  # 用于连接MySQL数据库
+import dotenv  # 用于加载环境变量
+import os  # 用于获取环境变量
+from typing import Dict, List, Optional, Union,Any  # 导入类型提示
 #数据库：username/password/email/created_data(data类型)
 class DatabaseManager:
     def __init__(self):
@@ -36,6 +36,33 @@ class DatabaseManager:
         except pymysql.MySQLError as e:
             print(f"Error connecting to MySQL: {e}")
             raise
+        #raise关键字用于保持异常链完整，或传递异常
+
+    def commit(self):
+        """
+        提交当前事务
+        将当前事务中的所有操作永久保存到数据库
+        """
+        if self.connection:
+            try:
+                self.connection.commit()
+                print("Transaction committed")
+            except pymysql.MySQLError as e:
+                print(f"Error committing transaction: {e}")
+                raise
+
+    def rollback(self):
+        """
+        回滚当前事务
+        撤销当前事务中的所有未提交操作
+        """
+        if self.connection:
+            try:
+                self.connection.rollback()
+                print("Transaction rolled back")
+            except pymysql.MySQLError as e:
+                print(f"Error rolling back transaction: {e}")
+                raise
 
     def close(self):
         """关闭数据库连接"""
@@ -89,7 +116,7 @@ class DatabaseManager:
         query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
         return self.execute_update(query, tuple(data.values()))
 
-    def select(self, table: str, columns: List[str] = ["*"], where: Optional[str] = None, 
+    def select(self, table: str, columns: List[str] = ["*"], where: Optional[str] = None, #optional等价于None或list[str]
                params: Optional[tuple] = None) -> List[Dict]:
         """
         查询数据

@@ -50,20 +50,43 @@ const display_loginform = ref(false)
 const change_display_loginform = () => {
     display_loginform.value = !display_loginform.value;
 }
+// 正则表达式定义
+/**
+ * - username 4~30 位,字母、汉字、数字、连字符（-），不能以数字开头，不能包含空格
+ *  password 8~12 位 字母、数字、特殊字符（!@#$%^&*()_+）,至少包含字母和数字，不能包含空格和汉字
+-* email 最长50个字符，也可以没有
+ */
+const usernameRegex = /^[a-zA-Z\u4e00-\u9fa5][a-zA-Z0-9\u4e00-\u9fa5-]{3,29}$/;
+const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[!-~]{8,12}$/;
 // 登录函数（含JWT双令牌处理）
 async function login(input_info) {
     if (input_info.username === '' || input_info.password === '') {
         message.info('用户名或密码不能为空');
-        return ;
+        return;
+    }
+    // 用户名格式验证
+    if (!usernameRegex.test(input_info.username)) {
+        message.error('用户名必须为4-30位字母/汉字/数字/连字符组合，且不能以数字开头');
+        return;
     }
 
+    // 密码格式验证
+    if (!passwordRegex.test(input_info.password)) {
+        message.error('密码必须为8-12位，包含字母和数字，可加特殊字符(!@#$%^&*等)');
+        return;
+    }
+
+    // 显示加载状态
+    message.loading('登录中...', 0);
+
     try {
-        // 1. 验证用户是否存在
+// 1. 验证用户是否存在
         const res = await axios.post('/api/user/get_info', {
             username: input_info.username
         });
 
-        if (!res.data) {
+        if (!res?.data) {
+            //防止返回的json不包含data字段，报错
             message.error('用户不存在');
             Modal.confirm({
                 title: '用户未注册',
@@ -91,7 +114,10 @@ async function login(input_info) {
             username: input_info.username,
             password: input_info.password
         });
-
+        if (!tokenRes?.data) {
+            message.error('登录失败');
+            return;
+        }
         // 4. 存储令牌
         localStorage.setItem('accessToken', tokenRes.data.accessToken);
         localStorage.setItem('refreshToken', tokenRes.data.refreshToken);
@@ -131,7 +157,7 @@ async function refreshTokens() {
         localStorage.setItem('accessToken', res.data.accessToken);
 
         // 3. 重新发起之前的请求（如果有）
-        if (res.data.refreshToken) {
+        if (res.data.refreshToken?) {
             localStorage.setItem('refreshToken', res.data.refreshToken);
         }
 
@@ -171,19 +197,18 @@ function isTokenExpired(token) {
         return true;
     }
 }
+//注册了之后要重新登录
 async function register(input_info) {
     try {
         const res = await axios.post('/api/auth/register', {
             ...input_info
         })
-
-        // 2. 存储令牌
-        localStorage.setItem('accessToken', res.data.accessToken);
-        localStorage.setItem('refreshToken', res.data.refreshToken);
-
-        // 3. 启动令牌自动刷新
-        startTokenRefresh();
-        message.success('欢迎！' + input_info.username);
+        if (!res?.data) {
+            message.error('注册失败');
+            return;
+        }
+        message.success(‘注册成功！请登录！’);
+        display_loginform.value=true;
         return;
     } catch (error) {
         message.error('注册失败');
