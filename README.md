@@ -22,19 +22,26 @@ python -m pip install cryptography
 - id
 - username 4~30 位,字母、汉字、数字、连字符（-），不能以数字开头，不能包含空格
 - password 8~12 位 字母、数字、特殊字符（!@#$%^&*()_+）,至少包含字母和数字，不能包含空格和汉字
-- email
-- created_date
-- is_active
+- email 最长50个字符，也可以没有
+- created_data
 
 ## 后端服务器
 
 - FASTAPI
 - 运行：`fastapi dev main.py`
 
+## 虚拟环境运行（可选）
+
+python -m venv myvenv     创建虚拟环境（Windows）
+myvenv\Scripts\activate  激活虚拟环境（Windows）
+pip install -r requirements.txt  安装依赖到虚拟环境中（Windows）
+fastapi dev main.py  运行（Windows）
+tip:在vscode中上方输入>，选择python解释器，选择myvenv\Scripts\python.exe即可
+pip list 查看安装列表，可以拿来手动写入requirements.txt
+
 ## 接口  
 
 - /api/auth/refresh  发送refresh_token获取新的access_token和refresh_token
-- /api/auth/login   注册登录用户信息列表
 - /api/user/get_info  根据提供的信息查询用户信息,这里现在只给username  
 - /api/auth/register 给出用户名和密码等，注册用户
 
@@ -53,10 +60,8 @@ python -m pip install cryptography
 
 4.可以导入校园社区，区分学长校友，咨询获得建议。
 
-## 问题
+## 推进
 
 1 后端缺乏对应函数
 
 2.python项目需要补充requirements.txt文件，否则手动安装依赖。
-
-3.考虑使虚拟环境

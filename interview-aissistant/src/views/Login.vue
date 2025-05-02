@@ -11,6 +11,7 @@
             </nav>
         </header>
         <!-- 登陆表单界面 -->
+         <Transition name="fade">
         <div v-if="display_loginform" class="loginform-box">
             <form action="">
                 <div class="input-box">
@@ -28,6 +29,7 @@
                 </div>
             </form>
         </div>
+         </Transition>
     </div>
 </template>
 <script setup>
@@ -52,7 +54,7 @@ const change_display_loginform = () => {
 async function login(input_info) {
     if (input_info.username === '' || input_info.password === '') {
         message.info('用户名或密码不能为空');
-        return { message: '用户名或密码不能为空', code: 0 };
+        return ;
     }
 
     try {
@@ -81,7 +83,7 @@ async function login(input_info) {
         // 2. 验证密码
         if (input_info.password !== res.data.password) {
             message.error('密码错误');
-            return { message: '密码错误', code: 401 };
+            return ;
         }
 
         // 3. 登录成功，获取双令牌
@@ -97,18 +99,11 @@ async function login(input_info) {
         // 5. 启动令牌自动刷新
         startTokenRefresh();
         message.success('欢迎回来！' + input_info.username);
-        return {
-            message: '登录成功',
-            ...res.data,
-            code: 200
-        };
+        return ;
 
     } catch (error) {
         message.error('登录失败');
-        return {
-            message: '登录服务异常',
-            code: 500
-        };
+        return ;
     }
 }
 
@@ -189,11 +184,7 @@ async function register(input_info) {
         // 3. 启动令牌自动刷新
         startTokenRefresh();
         message.success('欢迎！' + input_info.username);
-        return {
-            message: '注册成功',
-            ...res.data,
-            code: 200
-        };
+        return;
     } catch (error) {
         message.error('注册失败');
     }
@@ -227,6 +218,23 @@ header {
         background: rgba(255, 254, 254, 0.336);
         user-select: none;
     }
+}
+/* 电视机打开效果 - 从中心向四周展开 */
+/*transition的name自动匹配以name为前缀 */
+.fade-enter-active, .fade-leave-active {
+  transition: all 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55); /* 弹性动画 */
+}
+
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;/* 透明度 */
+  clip-path: circle(0% at 50% 50%); /* 从中心点收缩为 0 */
+  transform: scale(0.8); /* 初始缩小 */
+}
+
+.fade-enter-to, .fade-leave-from {
+  opacity: 1;/* 透明度 */
+  clip-path: circle(100% at 50% 50%); /* 展开至全屏 */
+  transform: scale(1); /* 恢复原大小 */
 }
 
 .links-box {
@@ -273,19 +281,19 @@ header {
     height: 80px;
     justify-content: space-between;
     align-items: center;
-}
 
-.input-box input {
-    height: 30px;
-    width: 80%;
-    outline: none;
-    border: solid 2px skyblue;
-    border-radius: 5px;
-    padding-left: 20px;
-}
+    input {
+        height: 30px;
+        width: 80%;
+        outline: none;
+        border: solid 2px skyblue;
+        border-radius: 5px;
+        padding-left: 20px;
+    }
 
-.input-box .login-title h2 {
-    font-size: 100px;
+    .login-title h2 {
+        font-size: 100px;
+    }
 }
 
 .login-btn-box {
@@ -295,19 +303,20 @@ header {
     display: flex;
     justify-content: space-around;
     align-items: center;
-}
+    cursor: pointer;
 
-.login-btn-box .login-btn {
-    height: 50%;
-    width: 150px;
-    border: none;
-    border-radius: 5px;
-    font-size: 25px;
-    background: transparent;
-}
+    .login-btn {
+        height: 50%;
+        width: 150px;
+        border: none;
+        border-radius: 5px;
+        font-size: 25px;
+        background: transparent;
+    }
 
-.login-btn-box a {
-    text-decoration: none;
-    font-size: 15px;
+    a {
+        text-decoration: none;
+        font-size: 15px;
+    }
 }
 </style>
