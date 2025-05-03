@@ -64,6 +64,7 @@ const display_loginform = ref(false)
 // 更新登陆界面状态
 const openloginform = () => {
     display_loginform.value = true;
+     input_info.value = {username: '',password: '',email: ''}
 }
 function closeLoginForm (){
     display_loginform.value = false; 
@@ -84,7 +85,7 @@ async function performLogin(input_info) {
     
     try {
         // 1. 验证用户是否存在
-        const res = await axios.post('/api/user/get_info', {
+        const res = await axios.get('/user/get_info', {
             username: input_info.username
         });
 
@@ -108,7 +109,7 @@ async function performLogin(input_info) {
         }
 
         // 3. 获取双令牌
-        const tokenRes = await axios.post('/api/auth/login', input_info);
+        const tokenRes = await axios.post('/auth/login', input_info);
         if (!tokenRes?.data) {
             message.error('登录失败');
             return false;
@@ -175,7 +176,7 @@ async function refreshTokens() {
     try {
         // 1. 用refreshToken获取新accessToken
         //第二个参数是请求体,第三个参数是配置，这里设置请求头
-        const res = await axios.post('/api/auth/refresh', null, {
+        const res = await axios.post('/auth/refresh', null, {
             headers: {
                 'Authorization': `Bearer ${refreshToken}`
             }
@@ -228,7 +229,7 @@ function isTokenExpired(token) {
 //注册了之后要重新登录
 async function register(input_info) {
     try {
-        const res = await axios.post('/api/auth/register', {
+        const res = await axios.post('/auth/register', {
             ...input_info
         })
         if (!res?.data) {
