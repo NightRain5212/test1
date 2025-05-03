@@ -200,11 +200,11 @@ async def login(request: RegisterRequest):
         }
     }
 
-# 传入 userinfo, 至少会包括用户名
+# 传入 查询参数, 至少会包括用户名
 @app.get("/api/user/get_info")
-async def get_info(request: UserInfoRequest):
+async def get_info(username: str):
     # 查询用户信息
-    user = db_manager.select("users", where="username = %s", params=(request.username,))
+    user = db_manager.select("users", where="username = %s", params=(username,))
     if not user:
         raise HTTPException(status_code=404, detail="用户未找到")
 

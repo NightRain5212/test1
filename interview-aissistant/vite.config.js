@@ -10,7 +10,8 @@ export default defineConfig(({ mode }) => {
     server: {
       proxy: {
         '/api': {
-          target: env.VITE_API_BASE_URL_TEST, // 使用加载的环境变量
+          //target: env.VITE_API_BASE_URL_TEST, // 使用加载的环境变量
+          target:"http://127.0.0.1:8000",
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api/, '/api/'),
           secure: false,
