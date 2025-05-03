@@ -13,7 +13,8 @@
         <!-- 登陆表单界面 -->
         <Transition name="fade">
             <!-- 阻止表单默认行为 -->
-            <div v-show="display_loginform" class="loginform-box " @submit.prevent="login(input_info)">
+            <div v-show="display_loginform" class="loginform-box " @submit.prevent="login(input_info)" moUseleave="hoverClose = false"
+                mouseenter="hoverClose = true">
                 <!-- 退出按钮 -->
                 <button class="close-btn" @click="closeLoginForm">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -57,6 +58,7 @@ const input_info = ref({
     password: '',
     email: ''
 })
+const hoverClose = ref(false)//一个退出按钮的变量
 // 是否显示登陆界面
 const display_loginform = ref(false)
 // 更新登陆界面状态
