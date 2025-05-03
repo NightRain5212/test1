@@ -63,7 +63,6 @@ const onOpenChange = openKeys => {
   } else {
     state.openKeys = latestOpenKey ? [latestOpenKey] : [];
   }
-
 };
 
 </script>
