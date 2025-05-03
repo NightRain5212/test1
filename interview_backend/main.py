@@ -217,5 +217,19 @@ async def get_info(request: UserInfoRequest):
     }
     return {"data":user_info}
 
-
+# 如果通过命令fastapi dev main.py，则不会执行下面的代码
+if __name__ == "__main__":
+    import subprocess
+    import sys
+    
+    # 使用 FastAPI CLI 启动应用
+    subprocess.run([
+        sys.executable,  # 当前 Python 解释器路径
+        "-m", 
+        "fastapi", 
+        "dev", 
+        "main.py",
+        "--host", "0.0.0.0",
+        "--port", os.getenv("PORT", "8000")
+    ])
 

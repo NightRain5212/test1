@@ -80,7 +80,7 @@ async function login(input_info) {
     message.loading('登录中...', 0);
 
     try {
-// 1. 验证用户是否存在
+        // 1. 验证用户是否存在
         const res = await axios.post('/api/user/get_info', {
             username: input_info.username
         });
@@ -157,7 +157,7 @@ async function refreshTokens() {
         localStorage.setItem('accessToken', res.data.accessToken);
 
         // 3. 重新发起之前的请求（如果有）
-        if (res.data.refreshToken?) {
+        if (res.data?.refreshToken) {
             localStorage.setItem('refreshToken', res.data.refreshToken);
         }
 
@@ -207,7 +207,7 @@ async function register(input_info) {
             message.error('注册失败');
             return;
         }
-        message.success(‘注册成功！请登录！’);
+        message.success('注册成功！请登录！');
         display_loginform.value=true;
         return;
     } catch (error) {
