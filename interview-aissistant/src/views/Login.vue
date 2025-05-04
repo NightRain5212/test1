@@ -5,31 +5,44 @@
             <nav>
                 <div class="links-box">
                 </div>
-                <div @click="change_display_loginform" class="nav-login-box">
+                <div @click="openloginform" class="nav-login-box">
                     LOGIN
                 </div>
             </nav>
         </header>
         <!-- 登陆表单界面 -->
-         <Transition name="fade">
-        <div v-if="display_loginform" class="loginform-box">
-            <form action="">
-                <div class="input-box">
-                    <label for="username">用户名:</label>
-                    <input type="text" id="username" placeholder="请输入4-30位用户名" v-model=input_info.username>
-                </div>
+        <Transition name="fade">
+            <!-- 阻止表单默认行为 -->
+            <div v-show="display_loginform" class="loginform-box " @submit.prevent="login(input_info)" moUseleave="hoverClose = false"
+                mouseenter="hoverClose = true">
+                <!-- 退出按钮 -->
+                <button class="close-btn" @click="closeLoginForm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                        :stroke="hoverClose ? '#fff' : '#999'" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+                <form  autocomplete="off">
+                    <div class="input-box">
+                        <label for="username">用户名:</label>
+                        <input type="text" id="username" placeholder="请输入4-30位用户名" v-model="input_info.username"
+                            required minlength="4" maxlength="30">
+                    </div>
 
-                <div class="input-box">
-                    <label for="password">密码:</label>
-                    <input type="password" id="password" placeholder="请输入8-12位密码" v-model=input_info.password>
-                </div>
+                    <div class="input-box">
+                        <label for="password">密码:</label>
+                        <input type="password" id="password" placeholder="请输入8-12位密码" v-model="input_info.password"
+                            required minlength="8" maxlength="12">
+                    </div>
 
-                <div class="login-btn-box">
-                    <button class="login-btn" @click="login(input_info)">Login</button>
-                </div>
-            </form>
-        </div>
-         </Transition>
+                    <div class="login-submit-btn">
+                        <button class="login-btn" @click="login(input_info)">Login</button>
+                    </div>
+                </form>
+            </div>
+        </Transition>
     </div>
 </template>
 <script setup>
@@ -39,74 +52,176 @@ import axios from "../utils/axios";
 import { useRouter } from 'vue-router'
 const route = useRouter() // 获取全局路由实例，一个app只有一个route实例
 import{Modal,message} from "ant-design-vue";
+import { debounce } from 'lodash-es';// 防抖函数
 const input_info = ref({
     username: '',
     password: '',
     email: ''
 })
+const hoverClose = ref(false)//一个退出按钮的变量
 // 是否显示登陆界面
 const display_loginform = ref(false)
 // 更新登陆界面状态
-const change_display_loginform = () => {
-    display_loginform.value = !display_loginform.value;
+const openloginform = () => {
+    display_loginform.value = true;
+     input_info.value = {username: '',password: '',email: ''}
 }
-// 登录函数（含JWT双令牌处理）
-async function login(input_info) {
-    if (input_info.username === '' || input_info.password === '') {
-        message.info('用户名或密码不能为空');
-        return ;
-    }
+function closeLoginForm (){
+    display_loginform.value = false; 
+    input_info.value = {username: '',password: '',email: ''}
+}
+// 正则表达式定义
+/**
+ * - username 4~30 位,字母、汉字、数字、连字符（-），不能以数字开头，不能包含空格
+ *  password 8~12 位 字母、数字、特殊字符（!@#$%^&*()_+）,至少包含字母和数字，不能包含空格和汉字
+-* email 最长50个字符，也可以没有
+ */
+ const usernameRegex = /^[a-zA-Z\u4e00-\u9fa5][a-zA-Z0-9\u4e00-\u9fa5-]{3,29}$/;
+const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[!-~]{8,12}$/;
+
+async function performLogin(input_info) {
+    const hideLoading = message.loading('登录中...', 0);
 
     try {
         // 1. 验证用户是否存在
-        const res = await axios.post('/api/user/get_info', {
-            username: input_info.username
+        const res = await axios.get('/user/get_info', {
+            params: {
+                username: input_info.username
+            }
         });
 
-        if (!res.data) {
-            message.error('用户不存在');
-            Modal.confirm({
-                title: '用户未注册',
-                content: '该用户未注册，是否立即注册？',
-                okText: '是',
-                cancelText: '否',
-                onOk() {
-                    register(); // 调用你的注册函数
-                },
-                onCancel() {
-                    message.info('已取消注册');
-                },
-            });
-            return;
+        // 用户不存在时的处理
+        if (!res?.data) {
+            return await handleUserNotExist(input_info);
         }
 
-        // 2. 验证密码
-        if (input_info.password !== res.data.password) {
-            message.error('密码错误');
-            return ;
+        // 2. 密码验证
+        if (!res.data?.password || input_info.password !== res.data.password) {
+            message.error(userData?.password ? '密码错误' : '无效密码');
+            return false;
         }
 
-        // 3. 登录成功，获取双令牌
-        const tokenRes = await axios.post('/api/auth/login', {
-            username: input_info.username,
-            password: input_info.password
-        });
-
-        // 4. 存储令牌
-        localStorage.setItem('accessToken', tokenRes.data.accessToken);
-        localStorage.setItem('refreshToken', tokenRes.data.refreshToken);
-
-        // 5. 启动令牌自动刷新
-        startTokenRefresh();
-        message.success('欢迎回来！' + input_info.username);
-        return ;
-
+        // 3. 登录流程
+        return await handleLoginSuccess(input_info);
     } catch (error) {
-        message.error('登录失败');
-        return ;
+        handleLoginError(error);
+        return false;
+    } finally {
+        hideLoading();
     }
 }
 
+// 用户不存在处理
+async function handleUserNotExist(input_info) {
+    message.error('用户不存在f55');
+    
+    return new Promise((resolve) => {
+        Modal.confirm({
+            title: '用户未注册',
+            content: `用户"${input_info.username}"未注册，是否立即注册？`,
+            okText: '注册',
+            cancelText: '取消',
+            async onOk() {
+                try {
+                    await register(input_info);
+                    message.success('注册成功！请重新登录');
+                    resolve('registered'); // 特殊返回值表示注册成功
+                } catch (error) {
+                    message.error(`注册失败: ${error.response?.data?.message || error.message}`);
+                    resolve(false);
+                }
+            },
+            onCancel() {
+                message.info('已取消注册');
+                resolve(false);
+            }
+        });
+    });
+}
+
+// 登录成功处理
+async function handleLoginSuccess(input_info) {
+    try {
+        const tokenRes = await axios.post('/auth/login', input_info);
+        
+        if (!tokenRes?.data?.accessToken) {
+            message.error('登录失败: 令牌获取异常');
+            return false;
+        }
+
+        // 存储令牌
+        localStorage.setItem('accessToken', tokenRes.data.accessToken);
+        localStorage.setItem('refreshToken', tokenRes.data.refreshToken);
+
+        startTokenRefresh();
+        message.success(`欢迎回来，${input_info.username}!`);
+        return true;
+    } catch (error) {
+        handleLoginError(error);
+        return false;
+    }
+}
+
+// 错误处理
+function handleLoginError(error) {
+    const errorMessage = error.response?.data?.message || '登录失败';
+    if (error.response?.status === 401) {
+        message.error('认证失败: ' + errorMessage);
+    } else {
+        message.error('登录错误: ' + errorMessage);
+    }
+}
+
+// 防抖登录
+const debouncedLogin = debounce(async (input_info, resolve) => {
+    const result = await performLogin(input_info);
+    resolve(result);
+}, 1000, { leading: true, trailing: false });//多次点击，第一次无间隔，最后一次无效
+
+// 对外暴露的登录函数
+async function login(input_info) {
+    // 输入验证
+    function validateInput(input_info) {
+        if (!input_info.username || !input_info.password) {
+            message.info('用户名或密码不能为空');
+            return false;
+        }
+
+        if (!usernameRegex.test(input_info.username)) {
+            message.error('用户名必须为4-30位字母/汉字/数字/连字符组合，且不能以数字开头');
+            return false;
+        }
+
+        if (!passwordRegex.test(input_info.password)) {
+            message.error('密码必须为8-12位，包含字母和数字，可加特殊字符(!@#$%^&*等)');
+            return false;
+        }
+        return true;
+    }
+    //resolve
+    return new Promise((resolve) => {
+        if (!validateInput(input_info)) {
+            return resolve(false);
+        }
+        debouncedLogin(input_info, resolve);
+    });
+}
+
+// 注册函数
+async function register(input_info) {
+    try {
+        const res = await axios.post('/auth/register', input_info);
+        
+        if (!res?.data) {
+            throw new Error('注册响应数据为空');
+        }
+        
+        return res.data;
+    } catch (error) {
+        console.error('注册失败:', error);
+        throw error; // 抛出错误让上层处理
+    }
+}
 // accessToken令牌刷新函数
 async function refreshTokens() {
     const refreshToken = localStorage.getItem('refreshToken');
@@ -121,7 +236,7 @@ async function refreshTokens() {
     try {
         // 1. 用refreshToken获取新accessToken
         //第二个参数是请求体,第三个参数是配置，这里设置请求头
-        const res = await axios.post('/api/auth/refresh', null, {
+        const res = await axios.post('/auth/refresh', null, {
             headers: {
                 'Authorization': `Bearer ${refreshToken}`
             }
@@ -131,7 +246,7 @@ async function refreshTokens() {
         localStorage.setItem('accessToken', res.data.accessToken);
 
         // 3. 重新发起之前的请求（如果有）
-        if (res.data.refreshToken) {
+        if (res.data?.refreshToken) {
             localStorage.setItem('refreshToken', res.data.refreshToken);
         }
 
@@ -161,7 +276,6 @@ function startTokenRefresh() {
         }
     }, 5 * 60 * 1000); // 5分钟
 }
-
 // 检查token是否过期
 function isTokenExpired(token) {
     try {
@@ -171,24 +285,7 @@ function isTokenExpired(token) {
         return true;
     }
 }
-async function register(input_info) {
-    try {
-        const res = await axios.post('/api/auth/register', {
-            ...input_info
-        })
 
-        // 2. 存储令牌
-        localStorage.setItem('accessToken', res.data.accessToken);
-        localStorage.setItem('refreshToken', res.data.refreshToken);
-
-        // 3. 启动令牌自动刷新
-        startTokenRefresh();
-        message.success('欢迎！' + input_info.username);
-        return;
-    } catch (error) {
-        message.error('注册失败');
-    }
-}
 </script>
 <style scoped lang="scss">
 .main-all {
@@ -273,7 +370,36 @@ header {
     border-radius: 15px;
 }
 
+.close-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;//圆角
+    display: flex;
+    align-items: center;//垂直居中
+    justify-content: center;//水平居中
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 1000;
+
+    &:hover {
+        background: #ff4444;
+    }
+
+    &:active {
+        transform: scale(0.9);//大小最终缩小到0.9倍
+        transition: transform 0.1s ease; //0.1秒内缩小
+    }
+
+    svg {
+        transition: stroke 0.2s ease; 
+    }
+}
 .input-box {
+    position:relative;
     display: flex;
     background: transparent;
     text-align: center;
@@ -285,7 +411,7 @@ header {
     input {
         height: 30px;
         width: 80%;
-        outline: none;
+        outline: none;//去除输入框的轮廓线
         border: solid 2px skyblue;
         border-radius: 5px;
         padding-left: 20px;
@@ -296,27 +422,48 @@ header {
     }
 }
 
-.login-btn-box {
+.login-submit-btn {
     background: transparent;
     height: 80px;
     text-align: center;
     display: flex;
     justify-content: space-around;
     align-items: center;
-    cursor: pointer;
+    transition: all 0.3s ease;
+    /* 添加过渡效果 */
 
     .login-btn {
         height: 50%;
-        width: 150px;
+        width: 80px;
         border: none;
         border-radius: 5px;
         font-size: 25px;
         background: transparent;
-    }
+        transition: all 0.3s ease;/* 按钮单独过渡 */
+        position: relative;/* 为动画效果做准备 */
+        color: #333;/* 默认文字颜色 */
+        cursor: pointer; /* 鼠标指针样式 */
+        overflow: hidden;/* 防止内容溢出 */
+        
+        /* 鼠标悬浮效果 */
+        &:hover {
+            color: #1a73e8;
+            /* 悬浮时文字颜色变化 */
+            transform: translateY(-3px);
+            /* 上浮效果 */
+            text-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            /* 添加轻微阴影增强立体感 */
+        }
 
-    a {
-        text-decoration: none;
-        font-size: 15px;
+        /* 按钮按下效果 */
+        &:active {
+            transform: translateY(1px);
+            /* 下压效果 */
+            text-shadow: none;
+            /* 移除阴影 */
+            color: #0d5bba;
+            /* 按下时颜色更深 */
+        }
     }
 }
 </style>

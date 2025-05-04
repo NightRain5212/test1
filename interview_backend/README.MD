@@ -1,4 +1,4 @@
-## 数据库连接
+# 数据库连接    
 
 -  SQLPub数据库MySQL
 - 依赖：
@@ -22,7 +22,10 @@ python -m pip install pymysql
     `created_date` DATE NOT NULL
 ```
 
-## 后端服务器
+
+# 后端服务器
+
+
 - FASTAPI
 - 运行：`fastapi dev main.py`
 
@@ -35,3 +38,6 @@ python -m pip install pymysql
 - `activate_user(username)`
 - `freeze_user(username)`
 - `isactive(username)`
+
+不要忽略.env，密码屏蔽
+

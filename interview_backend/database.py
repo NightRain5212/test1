@@ -1,8 +1,9 @@
 
-import pymysql
-import dotenv
-import os
-from typing import Dict, List, Optional, Union
+import pymysql  # 用于连接MySQL数据库
+import dotenv  # 用于加载环境变量
+import os  # 用于获取环境变量
+from typing import Dict, List, Optional, Union,Any  # 导入类型提示
+
 #数据库：username/password/email/created_data(data类型)
 class DatabaseManager:
     def __init__(self):
@@ -12,11 +13,13 @@ class DatabaseManager:
         self.DB_PASSWORD = os.getenv("DB_PASSWORD")
         self.DB_PORT = os.getenv("DB_PORT")
         self.DB_USER = os.getenv("DB_USER")
-        self.DB_NAME = "users"  # 可以改为从环境变量读取
+        self.DB_NAME =os.getenv("DB_NAME")  # 可以改为从环境变量读取
         self.timeout = 20
         
         self.connection = None
         self.connect()
+        #self.test_connection()
+        
 
     def connect(self):
         """建立数据库连接"""
@@ -37,6 +40,84 @@ class DatabaseManager:
         except pymysql.MySQLError as e:
             print(f"Error connecting to MySQL: {e}")
             raise
+        #raise关键字用于保持异常链完整，或传递异常
+
+    def test_connection(self):
+        """测试数据库连接并输出关键信息"""
+        print("✓ 开始数据库连接测试-------------------------------------------")
+        try:
+            if not self.connection or not self.connection.open:
+                self.connect()
+
+            with self.connection.cursor() as cursor:
+                # 1. 输出连接URL（隐藏密码）
+                safe_url = f"mysql://{self.DB_USER}:***@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+                print(f"✓ 连接URL: {safe_url}")
+
+                # 2. 检查服务器版本
+                cursor.execute("SELECT VERSION()")
+                version = cursor.fetchone()["VERSION()"]
+                print(f"✓ MySQL服务器版本: {version}")
+
+                # 3. 检查当前用户权限
+                cursor.execute(f"SHOW GRANTS FOR CURRENT_USER")
+                grants = cursor.fetchall()
+                print("\n✓ 用户权限:")
+                for grant in grants:
+                    print(f"  - {grant['Grants for {}@%'.format(self.DB_USER)]}")
+
+                # 4. 检查数据库是否存在
+                cursor.execute("SHOW DATABASES LIKE %s", (self.DB_NAME,))
+                db_exists = cursor.fetchone()
+                print(f"\n✓ 数据库状态: {'存在' if db_exists else '不存在'}")
+
+                # 5. 测试基本查询
+                cursor.execute("SELECT 1 AS connection_test")
+                test_result = cursor.fetchone()
+                print(f"✓ 连接测试: {'成功' if test_result['connection_test'] == 1 else '失败'}")
+
+                # 6. 检查SSL状态
+                cursor.execute("SHOW STATUS LIKE 'Ssl_cipher'")
+                ssl_status = cursor.fetchone()
+                print(f"✓ SSL加密: {'启用' if ssl_status['Value'] else '未启用'}")
+
+                return True
+
+        except pymysql.MySQLError as e:
+            print(f"✗ 连接测试失败: {e}")
+            # 特别处理权限错误
+            if e.args[0] == 1044:
+                print("  可能原因: 用户缺少数据库权限，请执行:")
+                print(f"  GRANT ALL PRIVILEGES ON {self.DB_NAME}.* TO '{self.DB_USER}'@'%';")
+            elif e.args[0] == 1045:
+                print("  可能原因: 用户名或密码错误")
+            return False
+
+    def commit(self):
+        """
+        提交当前事务
+        将当前事务中的所有操作永久保存到数据库
+        """
+        if self.connection:
+            try:
+                self.connection.commit()
+                print("Transaction committed")
+            except pymysql.MySQLError as e:
+                print(f"Error committing transaction: {e}")
+                raise
+
+    def rollback(self):
+        """
+        回滚当前事务
+        撤销当前事务中的所有未提交操作
+        """
+        if self.connection:
+            try:
+                self.connection.rollback()
+                print("Transaction rolled back")
+            except pymysql.MySQLError as e:
+                print(f"Error rolling back transaction: {e}")
+                raise
 
     def close(self):
         """关闭数据库连接"""
@@ -90,7 +171,7 @@ class DatabaseManager:
         query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
         return self.execute_update(query, tuple(data.values()))
 
-    def select(self, table: str, columns: List[str] = ["*"], where: Optional[str] = None, 
+    def select(self, table: str, columns: List[str] = ["*"], where: Optional[str] = None, #optional等价于None或list[str]
                params: Optional[tuple] = None) -> List[Dict]:
         """
         查询数据

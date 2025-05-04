@@ -4,11 +4,11 @@
       <a-menu v-model:selectedKeys="state.selectedKeys" mode="inline" :open-keys="state.openKeys" :items="items"
         @openChange="onOpenChange"></a-menu>
     </div>
-    <div v-if="state.selectedKeys[0]=='1.1'">
+    <!-- <div v-if="state.selectedKeys[0]=='1.1'">
       <routeLink to="/views/HomeView.vue">
         <router-view></router-view>
       </routeLink>
-    </div>
+    </div> -->
     <div class="right-main-content">
       <login></login>
     </div>
@@ -63,7 +63,6 @@ const onOpenChange = openKeys => {
   } else {
     state.openKeys = latestOpenKey ? [latestOpenKey] : [];
   }
-
 };
 
 </script>
