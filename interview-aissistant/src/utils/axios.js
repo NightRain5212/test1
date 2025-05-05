@@ -4,7 +4,7 @@ import axios from 'axios';
 // const BASE_URL = import.meta.env.DEV //vite提供的环境变量，判断是否是开发环境
 //   ? '/api' // 开发环境使用代理
 //   : import.meta.env.VITE_API_BASE_URL_PROD; // 生产环境用真实URL
-const BASE_URL ='/api' // /api前面的路径都会被删除
+const BASE_URL ='/api' // /api前面的路径都会被删除,用于绕过浏览器限制
 const instance = axios.create({
   baseURL: BASE_URL,
   timeout: 5000,

@@ -1,8 +1,9 @@
-
 import pymysql  # 用于连接MySQL数据库
 import dotenv  # 用于加载环境变量
 import os  # 用于获取环境变量
-from typing import Dict, List, Optional, Union,Any  # 导入类型提示
+import re # 用于正则表达式
+from typing import Dict, List, Optional, Union,Any,Tuple # 导入类型提示
+from contextlib import contextmanager  # 用于上下文管理器
 
 #数据库：username/password/email/created_data(data类型)
 class DatabaseManager:
@@ -20,7 +21,6 @@ class DatabaseManager:
         self.connect()
         #self.test_connection()
         
-
     def connect(self):
         """建立数据库连接"""
         try:
@@ -94,60 +94,59 @@ class DatabaseManager:
             return False
 
     def commit(self):
-        """
-        提交当前事务
-        将当前事务中的所有操作永久保存到数据库
-        """
-        if self.connection:
-            try:
-                self.connection.commit()
-                print("Transaction committed")
-            except pymysql.MySQLError as e:
-                print(f"Error committing transaction: {e}")
-                raise
+        """提交当前事务"""
+        try:
+            self.connection.commit()
+        except pymysql.MySQLError as e:
+            self.connection.rollback()
+            raise
 
     def rollback(self):
-        """
-        回滚当前事务
-        撤销当前事务中的所有未提交操作
-        """
-        if self.connection:
-            try:
-                self.connection.rollback()
-                print("Transaction rolled back")
-            except pymysql.MySQLError as e:
-                print(f"Error rolling back transaction: {e}")
-                raise
+        """回滚当前事务"""
+        self.connection.rollback()
 
+    @contextmanager
+    def transaction(self):
+        """事务上下文管理器"""
+        try:
+            yield self
+            self.commit()
+        except Exception:
+            self.rollback()
+            raise
     def close(self):
         """关闭数据库连接"""
         if self.connection:
             self.connection.close()
             print("Database connection closed")
 
+    def _validate_identifier(self, name: str) -> str:
+        """验证SQL标识符（表名、列名）防止注入"""
+        #暂时不启用
+        return name
+
+    def _build_where_clause(self, conditions: Dict[str, Any]) -> Tuple[str, Tuple]:
+        """安全构建WHERE子句"""
+        where_parts = []
+        params = []
+        for col, val in conditions.items():
+            self._validate_identifier(col)
+            where_parts.append(f"{col} = %s")
+            params.append(val)
+        return " AND ".join(where_parts), tuple(params)
+
     def execute_query(self, query: str, params: Optional[tuple] = None) -> List[Dict]:
-        """
-        执行查询操作（SELECT）
-        :param query: SQL查询语句
-        :param params: 查询参数
-        :return: 查询结果列表
-        """
+        """执行查询操作（安全参数化）"""
         try:
             with self.connection.cursor() as cursor:
                 cursor.execute(query, params or ())
-                result = cursor.fetchall()
-                return result
+                return cursor.fetchall()
         except pymysql.MySQLError as e:
             print(f"Error executing query: {e}")
             raise
 
     def execute_update(self, query: str, params: Optional[tuple] = None) -> int:
-        """
-        执行更新操作（INSERT/UPDATE/DELETE）
-        :param query: SQL语句
-        :param params: 参数
-        :return: 受影响的行数
-        """
+        """执行更新操作（安全参数化）"""
         try:
             with self.connection.cursor() as cursor:
                 affected_rows = cursor.execute(query, params or ())
@@ -158,64 +157,55 @@ class DatabaseManager:
             print(f"Error executing update: {e}")
             raise
 
-    # 以下是具体的CRUD操作方法
     def insert(self, table: str, data: Dict) -> int:
-        """
-        插入数据
-        :param table: 表名
-        :param data: 要插入的数据字典 {列名: 值}
-        :return: 受影响的行数
-        """
-        columns = ", ".join(data.keys())
+        """安全插入数据"""
+        self._validate_identifier(table)
+        columns = ", ".join([self._validate_identifier(col) for col in data.keys()])
         placeholders = ", ".join(["%s"] * len(data))
         query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
         return self.execute_update(query, tuple(data.values()))
 
-    def select(self, table: str, columns: List[str] = ["*"], where: Optional[str] = None, #optional等价于None或list[str]
-               params: Optional[tuple] = None) -> List[Dict]:
-        """
-        查询数据
-        :param table: 表名
-        :param columns: 要查询的列名列表
-        :param where: WHERE条件语句
-        :param params: WHERE条件参数
-        :return: 查询结果列表
-        """
-        columns_str = ", ".join(columns)
+    def select(self, table: str, columns: List[str] = ["*"], 
+              conditions: Optional[Dict[str, Any]] = None) -> List[Dict]:
+        """安全查询数据"""
+        self._validate_identifier(table)
+        validated_columns = [self._validate_identifier(col) if col != "*" else "*" 
+                            for col in columns]
+        columns_str = ", ".join(validated_columns)
+        
         query = f"SELECT {columns_str} FROM {table}"
-        if where:
-            query += f" WHERE {where}"
+        params = ()
+        
+        if conditions:
+            where_clause, params = self._build_where_clause(conditions)
+            query += f" WHERE {where_clause}"
+            
         return self.execute_query(query, params)
 
-    def update(self, table: str, data: Dict, where: str, params: Optional[tuple] = None) -> int:
-        """
-        更新数据
-        :param table: 表名
-        :param data: 要更新的数据字典 {列名: 新值}
-        :param where: WHERE条件语句
-        :param params: WHERE条件参数
-        :return: 受影响的行数
-        """
-        set_clause = ", ".join([f"{key} = %s" for key in data.keys()])
-        query = f"UPDATE {table} SET {set_clause} WHERE {where}"
-        return self.execute_update(query, tuple(data.values()) + (params or ()))
-
-    def delete(self, table: str, where: str, params: Optional[tuple] = None) -> int:
-        """
-        删除数据
-        :param table: 表名
-        :param where: WHERE条件语句
-        :param params: WHERE条件参数
-        :return: 受影响的行数
-        """
-        query = f"DELETE FROM {table} WHERE {where}"
+    def update(self, table: str, data: Dict, 
+              conditions: Optional[Dict[str, Any]] = None) -> int:
+        """安全更新数据"""
+        self._validate_identifier(table)
+        set_parts = []
+        set_params = []
+        for col, val in data.items():
+            self._validate_identifier(col)
+            set_parts.append(f"{col} = %s")
+            set_params.append(val)
+        
+        query = f"UPDATE {table} SET {', '.join(set_parts)}"
+        params = tuple(set_params)
+        
+        if conditions:
+            where_clause, where_params = self._build_where_clause(conditions)
+            query += f" WHERE {where_clause}"
+            params += where_params
+            
         return self.execute_update(query, params)
 
-    def __enter__(self):
-        """支持with语句"""
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """支持with语句"""
-        self.close()
-
+    def delete(self, table: str, conditions: Dict[str, Any]) -> int:
+        """安全删除数据"""
+        self._validate_identifier(table)
+        where_clause, params = self._build_where_clause(conditions)
+        query = f"DELETE FROM {table} WHERE {where_clause}"
+        return self.execute_update(query, params)

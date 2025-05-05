@@ -24,8 +24,8 @@
                         <line x1="6" y1="6" x2="18" y2="18"></line>
                     </svg>
                 </button>
-                <Transition name="form-switch" mode="out-in">
 
+                <Transition name="form-switch" mode="out-in">
                 <!-- 登录表单 -->
                 <form  autocomplete="off" v-if="!isRegisterMode">
                     <div class="input-box">
@@ -95,7 +95,6 @@
                 </Transition>
             </div>
         </Transition>
-
     </div>
 </template>
 <script setup>
@@ -109,7 +108,6 @@ import { debounce } from 'lodash-es';// 防抖函数
 const input_info = ref({
     username: '',
     password: '',
-    email: ''
 })
 // 注册表单数据
 const register_info = ref({
@@ -121,15 +119,18 @@ const register_info = ref({
 const hoverClose = ref(false)//一个退出按钮的变量
 // 是否显示登陆界面
 const display_loginform = ref(false)
+// 控制表单模式
+const isRegisterMode = ref(false)
 // 更新登陆界面状态
 const openloginform = () => {
     display_loginform.value = true;
-     input_info.value = {username: '',password: '',email: ''}
-    isRegisterMode.value = false;
+     input_info.value = {username: '',password: ''}
+     register_info.value = {username: '',email: '',password: '',confirmPassword: ''}
 }
 function closeLoginForm (){
     display_loginform.value = false; 
-    input_info.value = {username: '',password: '',email: ''}
+    input_info.value = {username: '',password: ''}
+    register_info.value = {username: '',email: '',password: '',confirmPassword: ''}
     // 延迟重置表单高度
     setTimeout(() => {
         const formBox = document.querySelector('.loginform-box');
@@ -147,6 +148,7 @@ function closeLoginForm (){
  */
  const usernameRegex = /^[a-zA-Z\u4e00-\u9fa5][a-zA-Z0-9\u4e00-\u9fa5-]{3,29}$/;
 const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[!-~]{8,12}$/;
+const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/
 
 async function performLogin(input_info) {
     const hideLoading = message.loading('登录中...', 0);
@@ -182,23 +184,17 @@ async function performLogin(input_info) {
 
 // 用户不存在处理
 async function handleUserNotExist(input_info) {
-    message.error('用户不存在f55');
+    message.error('用户不存在');
     
     return new Promise((resolve) => {
         Modal.confirm({
             title: '用户未注册',
             content: `用户"${input_info.username}"未注册，是否立即注册？`,
-            okText: '注册',
-            cancelText: '取消',
-            async onOk() {
-                try {
-                    await register(input_info);
-                    message.success('注册成功！请重新登录');
-                    resolve('registered'); // 特殊返回值表示注册成功
-                } catch (error) {
-                    message.error(`注册失败: ${error.response?.data?.message || error.message}`);
-                    resolve(false);
-                }
+            okText: '是',
+            cancelText: '否',
+            onOk() {
+                isRegisterMode.value = true; // 切换到注册模式
+                resolve('registered'); // 特殊返回值表示注册成功
             },
             onCancel() {
                 message.info('已取消注册');
@@ -233,11 +229,11 @@ async function handleLoginSuccess(input_info) {
 
 // 错误处理
 function handleLoginError(error) {
-    const errorMessage = error.response?.data?.message || '登录失败';
+    const errorMessage = error.response?.data?.message || '';
     if (error.response?.status === 401) {
-        message.error('认证失败: ' + errorMessage);
+        message.error('认证失败!' + errorMessage);
     } else {
-        message.error('登录错误: ' + errorMessage);
+        message.error('登录错误!' + errorMessage);
     }
 }
 
@@ -281,37 +277,25 @@ async function login(input_info) {
         debouncedLogin(input_info, resolve);
     });
 }
-
 // 注册函数
 async function register(register_info) {
-    // try {
-    //     const res = await axios.post('/auth/register', input_info);
-        
-    //     if (!res?.data) {
-    //         throw new Error('注册响应数据为空');
-    //     }
-        
-    //     return res.data;
-    // } catch (error) {
-    //     console.error('注册失败:', error);
-    //     throw error; // 抛出错误让上层处理
-    //}
     try {
-        const res = await axios.post('/auth/register', {
-            username: register_info.value.username,
-            password: register_info.value.password,
-            email: register_info.value.email
-        })
+        const res = await axios.post('/auth/register', register_info)//post可以传对象
 
+        if (!res.data) {
+            message.info('用户已注册！')
+        }//规定返回data为null则用户已注册
         if (res.data) {
             message.success('注册成功！')
-            // 切换到登录模式
-            isRegisterMode.value = false
-            // 预填充用户名
-            input_info.value.username = register_info.value.username
         }
+        // 切换到登录模式
+        isRegisterMode.value = false
+        // 预填充用户名
+        input_info.value.username = register_info.value.username
+        input_info.value.password = register_info.value.password
+        register_info = { username: '', email: '', password: '', confirmPassword: '' }
     } catch (error) {
-        message.error(`注册失败: ${error.response?.data?.message || error.message}`);
+        message.error(`注册失败！ ${error.response?.data?.message || error.message||''}`);
     }
 }
 // accessToken令牌刷新函数
@@ -378,13 +362,6 @@ function isTokenExpired(token) {
     }
 }
 
-// 控制表单模式
-const isRegisterMode = ref(false)
-
-
-// 邮箱验证正则
-const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/
-
 // 注册处理函数
 async function handleRegister(e) {
     e.preventDefault(); // 阻止默认提交行为
@@ -425,25 +402,6 @@ async function handleRegister(e) {
         }
         debouncedRegister(register_info, resolve);
     });
-
-
-    try {
-        const res = await axios.post('/auth/register', {
-            username: register_info.value.username,
-            password: register_info.value.password,
-            email: register_info.value.email
-        })
-
-        if (res.data) {
-            message.success('注册成功！')
-            // 切换到登录模式
-            isRegisterMode.value = false
-            // 预填充用户名
-            input_info.value.username = register_info.value.username
-        }
-    } catch (error) {
-        message.error(`注册失败: ${error.response?.data?.message || error.message}`)
-    }
 }
 
 // 切换登录/注册模式
@@ -477,7 +435,6 @@ function switchMode() {
     }
 }
 
-
 </script>
 <style scoped lang="scss">
 .main-all {
@@ -508,24 +465,24 @@ header {
         user-select: none;
     }
 }
-/* 电视机打开效果 - 从中心向四周展开 */
-/*transition的name自动匹配以name为前缀 */
-.fade-enter-active, .fade-leave-active {
-  transition: all 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55); /* 弹性动画 */
-}
+// /* 电视机扩散模式 */
+// /*transition的name自动匹配以name为前缀 */
+// .fade-enter-active, .fade-leave-active {
+//   transition: all 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55); /* 弹性动画 */
+// }
 
-.fade-enter-from, .fade-leave-to {
-  opacity: 0;/* 透明度 */
-  clip-path: circle(0% at 50% 50%); /* 从中心点收缩为 0 */
-  transform: scale(0.8); /* 初始缩小 */
-}
+// .fade-enter-from, .fade-leave-to {
+//   opacity: 0;/* 透明度 */
+//   clip-path: circle(0% at 50% 50%); /* 从中心点收缩为 0 */
+//   transform: scale(0.8); /* 初始缩小 */
+// }
 
-.fade-enter-to, .fade-leave-from {
-  opacity: 1;/* 透明度 */
-  clip-path: circle(100% at 50% 50%); /* 展开至全屏 */
-  transform: scale(1); /* 恢复原大小 */
-}
-/* 修复动画类名和效果 */
+// .fade-enter-to, .fade-leave-from {
+//   opacity: 1;/* 透明度 */
+//   clip-path: circle(100% at 50% 50%); /* 展开至全屏 */
+//   transform: scale(1); /* 恢复原大小 */
+// }
+/* 渐显模式 */
 .fade-enter-active,
 .fade-leave-active {
     transition: all 0.5s ease;
@@ -543,8 +500,6 @@ header {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
 }
-
-
 
 .links-box {
     background: transparent;
@@ -630,24 +585,11 @@ header {
     input {
         height: 30px;
         width: 80%;
-        outline: none;//去除输入框的轮廓线
+        /*去除输入框的轮廓线*/
+        outline: none;
         border: solid 2px skyblue;
         border-radius: 5px;
         padding-left: 20px;
-    }
-
-    .login-title h2 {
-        font-size: 100px;
-    }
-    label {
-        min-width: 80px; // 固定标签宽度
-        text-align: right;
-        margin-right: 10px;
-        color: #333;
-    }
-    
-    input {
-        // ...existing code...
         transition: border-color 0.3s ease;
         
         &:focus {
@@ -655,6 +597,18 @@ header {
             box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
         }
     }
+
+    .login-title h2 {
+        font-size: 100px;
+    }
+    label {
+        /*固定标签宽度*/
+        min-width: 80px; 
+        text-align: right;
+        margin-right: 10px;
+        color: #333;
+    }
+    
 }
 
 .login-submit-btn {
@@ -730,13 +684,13 @@ header {
 }
 
 .form-switch-enter-from {
-    transform: translateX(100%);
-    opacity: 0;
+    transform: translateX(100%);/* 从右侧进入 */
+    opacity: 0;/* 初始透明度 */
 }
 
 .form-switch-leave-to {
-    transform: translateX(-100%);
-    opacity: 0;
+    transform: translateX(-100%);/* 从左侧离开 */
+    opacity: 0;/* 离开时的透明度 */
 }
 
 /* 表单容器样式 */
