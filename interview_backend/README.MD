@@ -1,22 +1,43 @@
 # 数据库连接    
 
-- aiven 数据库MySQL
+-  SQLPub数据库MySQL
 - 依赖：
 
 python -m pip install pymysql
-python -m pip install cryptography
+
+```
 
 - users表单关键字
+    - username
+    - password
+    - email
+    - created_date
+    - is_active
+    - 定义如下：
+```mysql
+    `username` VARCHAR(20) UNIQUE NOT NULL primary key,
+    `password` VARCHAR(20) NOT NULL,
+    `email` VARCHAR(50) NOT NULL,
+    `is_active` BOOLEAN DEFAULT false,
+    `created_date` DATE NOT NULL
+```
 
-- id
-- username 4~30 位,字母、汉字、数字、连字符（-），不能以数字开头，不能包含空格
-- password 8~12 位 字母、数字、特殊字符（!@#$%^&*()_+）,至少包含字母和数字，不能包含空格和汉字
-- email 最长50个字符，也可以没有
-- created_data
 
 # 后端服务器
+
 
 - FASTAPI
 - 运行：`fastapi dev main.py`
 
+## 数据库接口
+- `create_user(username,password,email,is_active = False)`
+- `delete_user(username)`
+- `update_user_password(username,password)`
+- `update_user_email(username,email)`
+- `user_info(username)`
+- `activate_user(username)`
+- `freeze_user(username)`
+- `isactive(username)`
+
 不要忽略.env，密码屏蔽
+

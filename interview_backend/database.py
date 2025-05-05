@@ -1,7 +1,9 @@
+
 import pymysql  # 用于连接MySQL数据库
 import dotenv  # 用于加载环境变量
 import os  # 用于获取环境变量
 from typing import Dict, List, Optional, Union,Any  # 导入类型提示
+
 #数据库：username/password/email/created_data(data类型)
 class DatabaseManager:
     def __init__(self):
