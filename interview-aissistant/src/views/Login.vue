@@ -13,7 +13,7 @@
         <!-- 登陆表单界面 -->
         <Transition name="fade">
             <!-- 阻止表单默认行为 -->
-            <div v-show="display_loginform" class="loginform-box " @submit.prevent="login(input_info)" moUseleave="hoverClose = false"
+            <div v-if="display_loginform" class="loginform-box" @submit.prevent="login(input_info)" moUseleave="hoverClose = false" 
                 mouseenter="hoverClose = true">
                 <!-- 退出按钮 -->
                 <button class="close-btn" @click="closeLoginForm">
@@ -24,7 +24,10 @@
                         <line x1="6" y1="6" x2="18" y2="18"></line>
                     </svg>
                 </button>
-                <form  autocomplete="off">
+                <Transition name="form-switch" mode="out-in">
+
+                <!-- 登录表单 -->
+                <form  autocomplete="off" v-if="!isRegisterMode">
                     <div class="input-box">
                         <label for="username">用户名:</label>
                         <input type="text" id="username" placeholder="请输入4-30位用户名" v-model="input_info.username"
@@ -40,13 +43,63 @@
                     <div class="login-submit-btn">
                         <button class="login-btn" @click="login(input_info)">Login</button>
                     </div>
+                    <div class="switch-mode">
+                        <span>还没有账号？</span>
+                        <a href="#" @click.prevent="switchMode">立即注册</a>
+                    </div>
                 </form>
+
+                <!-- 注册表单 -->
+                <form autocomplete="off" v-else @submit.prevent="handleRegister">
+                    <div class="input-box">
+                        <label for="reg-username">用户名:</label>
+                        <input type="text" id="reg-username" 
+                            placeholder="请输入4-30位用户名" 
+                            v-model="register_info.username"
+                            required minlength="4" maxlength="30">
+                    </div>
+
+                    <div class="input-box">
+                        <label for="reg-email">邮箱:</label>
+                        <input type="email" id="reg-email" 
+                            placeholder="请输入邮箱" 
+                            v-model="register_info.email"
+                            required>
+                    </div>
+
+                    <div class="input-box">
+                        <label for="reg-password">密码:</label>
+                        <input type="password" id="reg-password" 
+                            placeholder="请输入8-12位密码" 
+                            v-model="register_info.password"
+                            required minlength="8" maxlength="12">
+                    </div>
+
+                    <div class="input-box">
+                        <label for="reg-confirm">确认密码:</label>
+                        <input type="password" id="reg-confirm" 
+                            placeholder="请再次输入密码" 
+                            v-model="register_info.confirmPassword"
+                            required>
+                    </div>
+
+                    <div class="login-submit-btn">
+                        <button class="login-btn" @click="handleRegister">注册</button>
+                    </div>
+
+                    <div class="switch-mode">
+                        <span>已有账号？</span>
+                        <a href="#" @click.prevent="switchMode">返回登录</a>
+                    </div>
+                </form>
+                </Transition>
             </div>
         </Transition>
+
     </div>
 </template>
 <script setup>
-import { ref } from 'vue';
+import { h, ref } from 'vue';
 //登录
 import axios from "../utils/axios";
 import { useRouter } from 'vue-router'
@@ -58,6 +111,13 @@ const input_info = ref({
     password: '',
     email: ''
 })
+// 注册表单数据
+const register_info = ref({
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
+});
 const hoverClose = ref(false)//一个退出按钮的变量
 // 是否显示登陆界面
 const display_loginform = ref(false)
@@ -65,10 +125,19 @@ const display_loginform = ref(false)
 const openloginform = () => {
     display_loginform.value = true;
      input_info.value = {username: '',password: '',email: ''}
+    isRegisterMode.value = false;
 }
 function closeLoginForm (){
     display_loginform.value = false; 
     input_info.value = {username: '',password: '',email: ''}
+    // 延迟重置表单高度
+    setTimeout(() => {
+        const formBox = document.querySelector('.loginform-box');
+        if (formBox) {
+            formBox.style.height = '300px';
+        }
+    }, 300);
+
 }
 // 正则表达式定义
 /**
@@ -178,6 +247,12 @@ const debouncedLogin = debounce(async (input_info, resolve) => {
     resolve(result);
 }, 1000, { leading: true, trailing: false });//多次点击，第一次无间隔，最后一次无效
 
+// 防抖注册
+const debouncedRegister = debounce(async (register_info, resolve) => {
+    const result = await register(register_info);
+    resolve(result);
+}, 1000, { leading: true, trailing: false });//多次点击，第一次无间隔，最后一次无效
+
 // 对外暴露的登录函数
 async function login(input_info) {
     // 输入验证
@@ -208,18 +283,35 @@ async function login(input_info) {
 }
 
 // 注册函数
-async function register(input_info) {
+async function register(register_info) {
+    // try {
+    //     const res = await axios.post('/auth/register', input_info);
+        
+    //     if (!res?.data) {
+    //         throw new Error('注册响应数据为空');
+    //     }
+        
+    //     return res.data;
+    // } catch (error) {
+    //     console.error('注册失败:', error);
+    //     throw error; // 抛出错误让上层处理
+    //}
     try {
-        const res = await axios.post('/auth/register', input_info);
-        
-        if (!res?.data) {
-            throw new Error('注册响应数据为空');
+        const res = await axios.post('/auth/register', {
+            username: register_info.value.username,
+            password: register_info.value.password,
+            email: register_info.value.email
+        })
+
+        if (res.data) {
+            message.success('注册成功！')
+            // 切换到登录模式
+            isRegisterMode.value = false
+            // 预填充用户名
+            input_info.value.username = register_info.value.username
         }
-        
-        return res.data;
     } catch (error) {
-        console.error('注册失败:', error);
-        throw error; // 抛出错误让上层处理
+        message.error(`注册失败: ${error.response?.data?.message || error.message}`);
     }
 }
 // accessToken令牌刷新函数
@@ -286,6 +378,106 @@ function isTokenExpired(token) {
     }
 }
 
+// 控制表单模式
+const isRegisterMode = ref(false)
+
+
+// 邮箱验证正则
+const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/
+
+// 注册处理函数
+async function handleRegister(e) {
+    e.preventDefault(); // 阻止默认提交行为
+    console.log('注册信息:', register_info.value)
+    // 输入验证
+    function validateInput(register_info) {
+
+        if (!usernameRegex.test(register_info.value.username)) {
+            message.error('用户名必须为4-30位字母/汉字/数字/连字符组合，且不能以数字开头');
+            return false;
+        }
+
+        if (!passwordRegex.test(register_info.value.password)) {
+            message.error('密码必须为8-12位，包含字母和数字，可加特殊字符(!@#$%^&*等)');
+            return false;
+        }
+
+        if (register_info.value.password !== register_info.value.confirmPassword) {
+            message.error('两次输入的密码不一致')
+            return false;
+        }
+        if (!register_info.value.username || !register_info.value.password || 
+            !register_info.value.email || !register_info.value.confirmPassword) {
+            message.error('请填写所有必填项')
+            return false;
+        }
+        if (!emailRegex.test(register_info.value.email)) {
+            message.error('邮箱格式不正确')
+            return false;
+        }
+        return true;
+    }
+    
+    //resolve
+    return new Promise((resolve) => {
+        if (!validateInput(register_info)) {
+            return resolve(false);
+        }
+        debouncedRegister(register_info, resolve);
+    });
+
+
+    try {
+        const res = await axios.post('/auth/register', {
+            username: register_info.value.username,
+            password: register_info.value.password,
+            email: register_info.value.email
+        })
+
+        if (res.data) {
+            message.success('注册成功！')
+            // 切换到登录模式
+            isRegisterMode.value = false
+            // 预填充用户名
+            input_info.value.username = register_info.value.username
+        }
+    } catch (error) {
+        message.error(`注册失败: ${error.response?.data?.message || error.message}`)
+    }
+}
+
+// 切换登录/注册模式
+function switchMode() {
+    // 获取表单容器
+    const formBox = document.querySelector('.loginform-box');
+    
+    // 切换前记录当前高度
+    const startHeight = formBox.offsetHeight;
+    
+    // 切换表单模式
+    isRegisterMode.value = !isRegisterMode.value;
+    
+    // 清空表单
+    if (isRegisterMode.value) {
+        register_info.value = {
+            username: '',
+            email: '',
+            password: '',
+            confirmPassword: ''
+        }
+        // 设置注册表单高度
+        formBox.style.height = '450px';
+    } else {
+        input_info.value = {
+            username: '',
+            password: ''
+        }
+        // 设置登录表单高度
+        formBox.style.height = '300px';
+    }
+}
+
+
 </script>
 <style scoped lang="scss">
 .main-all {
@@ -333,6 +525,26 @@ header {
   clip-path: circle(100% at 50% 50%); /* 展开至全屏 */
   transform: scale(1); /* 恢复原大小 */
 }
+/* 修复动画类名和效果 */
+.fade-enter-active,
+.fade-leave-active {
+    transition: all 0.5s ease;
+    will-change: transform, opacity;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+}
+
+.fade-enter-to,
+.fade-leave-from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+
 
 .links-box {
     background: transparent;
@@ -356,18 +568,25 @@ header {
     }
 }
 
+
 .loginform-box {
-    position: absolute;
+    position: fixed; // 改为 fixed 定位
     padding: 20px;
     top: 50%;
     left: 50%;
     width: 400px;
-    height: 300px;
     transform: translate(-50%, -50%);
     background: #fff;
     display: flex;
     flex-direction: column;
     border-radius: 15px;
+    height: auto;
+    min-height: 300px;
+    max-height: 500px;
+    transition: all 0.3s ease;
+    overflow: hidden;
+    transform-origin: center center; // 添加变换原点
+    will-change: transform, opacity; // 优化动画性能
 }
 
 .close-btn {
@@ -403,8 +622,8 @@ header {
     display: flex;
     background: transparent;
     text-align: center;
-    margin: 10px auto;
-    height: 80px;
+    margin: 5px auto;
+    height: 70px;
     justify-content: space-between;
     align-items: center;
 
@@ -419,6 +638,22 @@ header {
 
     .login-title h2 {
         font-size: 100px;
+    }
+    label {
+        min-width: 80px; // 固定标签宽度
+        text-align: right;
+        margin-right: 10px;
+        color: #333;
+    }
+    
+    input {
+        // ...existing code...
+        transition: border-color 0.3s ease;
+        
+        &:focus {
+            border-color: #1a73e8;
+            box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
+        }
     }
 }
 
@@ -466,4 +701,49 @@ header {
         }
     }
 }
+
+.switch-mode {
+    text-align: center;
+    margin-top: 10px;
+    
+    span {
+        color: #666;
+    }
+    
+    a {
+        color: #1a73e8;
+        text-decoration: none;
+        margin-left: 5px;
+        
+        &:hover {
+            text-decoration: underline;
+        }
+    }
+}
+
+/* 表单切换动画 */
+.form-switch-enter-active,
+.form-switch-leave-active {
+    transition: all 0.3s ease;
+    position: absolute;
+    width: 100%;
+}
+
+.form-switch-enter-from {
+    transform: translateX(100%);
+    opacity: 0;
+}
+
+.form-switch-leave-to {
+    transform: translateX(-100%);
+    opacity: 0;
+}
+
+/* 表单容器样式 */
+.form-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
 </style>
