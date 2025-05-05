@@ -30,16 +30,6 @@ python -m pip install cryptography
 - FASTAPI
 - 运行：`fastapi dev main.py`
 
-## 虚拟环境运行（可选）
-
-python -m venv myvenv     创建虚拟环境（Windows）  
-myvenv\Scripts\activate  激活虚拟环境（Windows）  
-pip install -r requirements.txt  安装依赖到虚拟环境中（Windows）  
-pip install 包名 && pip freeze > requirements.txt
-fastapi dev main.py  运行（Windows）   
-tip:在vscode中上方输入>，选择python解释器，选择myvenv\Scripts\python.exe即可   
-pip list 查看安装列表，可以拿来手动写入requirements.txt    
-
 ## 接口  
 
 - /api/auth/refresh  发送refresh_token获取新的access_token和refresh_token
