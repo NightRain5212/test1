@@ -5,7 +5,6 @@
 - 运行
 - npm install
 - npm run dev
-- 
 - push前（如果安装了新的东西忘记使用--save）
 - npm list,然后把输出结果和 package.json 一起提交给ai处理
 
@@ -32,15 +31,15 @@ python -m pip install cryptography
 
 ## 接口  
 
-- /api/auth/refresh  发送refresh_token获取新的access_token和refresh_token
+- /api/auth/refresh  发送refresh_token获取新的access_token
 - /api/user/get_info  根据提供的信息查询用户信息,这里现在只给username  
-- /api/auth/register 给出用户名和密码等，注册用户，返回字段不含data则失败;默认用户还要登录
+- /api/auth/register 给出用户名和密码等，注册用户，返回字段不含data则用户已经注册;默认用户还要登录
 - /api/auth/login  给出用户名和密码，登录用户，返回新的令牌
 
 ## 开发阶段
 
 1. 初期构建项目框架，实现简单的登录全功能
-2. 预：一边优化前端页面，优化性能，一般纵向拓展功能
+2. 一边优化前端页面，优化性能，一般纵向拓展功能
 
 ## 功能目标
 
@@ -54,6 +53,4 @@ python -m pip install cryptography
 
 ## 推进
 
-1.登录进入测试阶段
-
-2.前端进入长期优化阶段
+实现特定功能+修复bug
