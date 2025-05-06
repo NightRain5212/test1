@@ -64,15 +64,15 @@ instance.interceptors.request.use(
     return Promise.reject(error);
   }
 );
-// 响应拦截器
-// instance.interceptors.response.use(
-//   (response) => {
-//     return response.data;
-//   },
-//   (error) => {
-//     console.error('API Error:', error);
-//     return Promise.reject(error.response?.data || error);
-//   }
-// );
+//响应拦截器
+instance.interceptors.response.use(
+  (response) => {
+    return response.data;//直接返回响应tibody
+  },
+  (error) => {
+    console.error('API Error:', error);
+    return Promise.reject(error.response?.data || error);
+  }
+);
 
 export default instance;

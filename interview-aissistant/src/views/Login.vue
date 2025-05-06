@@ -55,7 +55,7 @@
                         <label for="reg-username">用户名:</label>
                         <input type="text" id="reg-username" 
                             placeholder="请输入4-30位用户名" 
-                            v-model="registerinput_info.r_username"
+                            v-model="registerinput_info.username"
                             required minlength="4" maxlength="30">
                     </div>
 
@@ -63,7 +63,7 @@
                         <label for="reg-email">邮箱:</label>
                         <input type="email" id="reg-email" 
                             placeholder="请输入邮箱" 
-                            v-model="registerinput_info.r_email"
+                            v-model="registerinput_info.email"
                             required>
                     </div>
 
@@ -71,7 +71,7 @@
                         <label for="reg-password">密码:</label>
                         <input type="password" id="reg-password" 
                             placeholder="请输入8-12位密码" 
-                            v-model="registerinput_info.r_password"
+                            v-model="registerinput_info.password"
                             required minlength="8" maxlength="12">
                     </div>
 
@@ -79,7 +79,7 @@
                         <label for="reg-confirm">确认密码:</label>
                         <input type="password" id="reg-confirm" 
                             placeholder="请再次输入密码" 
-                            v-model="registerinput_info.r_confirmPassword"
+                            v-model="registerinput_info.confirmPassword"
                             required>
                     </div>
 
@@ -105,16 +105,19 @@ import { useRouter } from 'vue-router'
 const route = useRouter() // 获取全局路由实例，一个app只有一个route实例
 import{Modal,message} from "ant-design-vue";
 import { debounce } from 'lodash-es';// 防抖函数
+
+import {  useStore } from '../store'
+const store = useStore() // 获取全局状态管理实例，一个app只有一个store实例
 const logininput_info = ref({
     username: '',
     password: '',
 })
 // 注册表单数据
 const registerinput_info = ref({
-    r_username: '',
-    r_email: '',
-    r_password: '',
-    r_confirmPassword: ''
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
 });
 const hoverClose = ref(false)//一个退出按钮的变量
 // 是否显示登陆界面
@@ -129,10 +132,10 @@ function clear_login() {
 }
 function clear_register() {
     registerinput_info.value = {
-        r_username: '',
-        r_email: '',
-        r_password: '',
-        r_confirmPassword: ''
+        username: '',
+        email: '',
+        password: '',
+        confirmPassword: ''
     } 
 }
 // 更新登陆界面状态
@@ -162,8 +165,7 @@ function closeLoginForm (){
 const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[!-~]{8,12}$/;
 const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/
 
-async function performLogin() {
-    const input_info={...logininput_info}//避免多层引用
+async function performLogin(input_info) {
     const hideLoading = message.loading('登录中...', 0);
 
     console.log('登录信息:', input_info);
@@ -175,20 +177,18 @@ async function performLogin() {
             }
         });
        console.log('返回体:', res)
-        
+
         // 用户不存在时的处理
         if (!res?.data) {
-            return await handleUserNotExist();
+            return await handleUserNotExist(input_info);
         }
-
         // 2. 密码验证
         if (!res.data?.password || input_info.password !== res.data.password) {
-            message.error(userData?.password ? '密码错误' : '无效密码');
+            message.error(res.data?.password ? '密码错误' : '密码无效');
             return false;
         }
-
         // 3. 登录流程
-        return await handleLoginSuccess();
+        return await handleLoginSuccess(input_info);
     } catch (error) {
         handleLoginError(error);
         return false;
@@ -198,13 +198,13 @@ async function performLogin() {
 }
 
 // 用户不存在处理
-async function handleUserNotExist() {
+async function handleUserNotExist(input_info) {
     message.error('用户不存在');
     
     return new Promise((resolve) => {
         Modal.confirm({
             title: '用户未注册',
-            content: `用户"${logininput_info.username}"未注册，是否立即注册？`,
+            content: `用户"${input_info.username}"未注册，是否立即注册？`,
             okText: '是',
             cancelText: '否',
             onOk() {
@@ -220,8 +220,7 @@ async function handleUserNotExist() {
 }
 
 // 登录成功处理
-async function handleLoginSuccess() {
-    const input_info={...logininput_info}//避免多层引用
+async function handleLoginSuccess(input_info) {
     try {
         const tokenRes = await axios.post('/auth/login', input_info);
         console.log('请求令牌，返回：', tokenRes)
@@ -235,6 +234,7 @@ async function handleLoginSuccess() {
 
         startTokenRefresh(tokenRes.data.expired_in);
         message.success(`欢迎回来，${input_info.username}!`);
+        display_loginform.value = false; // 关闭登录界面
         return true;
     } catch (error) {
         handleLoginError(error);
@@ -244,31 +244,31 @@ async function handleLoginSuccess() {
 
 // 错误处理
 function handleLoginError(error) {
-    const errorMessage = error.response?.data?.message || '';
+    console.log('登录错误:', error);
     if (error.response?.status === 401) {
-        message.error('认证失败!' + errorMessage);
+        message.error('认证失败!');
     } else {
-        message.error('登录错误!' + errorMessage);
+        message.error('登录错误!');
     }
 }
 
 // 防抖登录
-const debouncedLogin = debounce(async (resolve) => {
-    const result = await performLogin();
+const debouncedLogin = debounce(async (input_info,resolve) => {
+    const result = await performLogin(input_info);
     resolve(result);
 }, 1000, { leading: true, trailing: false });//多次点击，第一次无间隔，最后一次无效
 
 // 防抖注册
-const debouncedRegister = debounce(async (resolve) => {
-    const result = await register();
+const debouncedRegister = debounce(async (input_info,resolve) => {
+    const result = await register(input_info);
     resolve(result);
 }, 1000, { leading: true, trailing: false });//多次点击，第一次无间隔，最后一次无效
 
 // 对外暴露的登录函数
 async function login() {
+    const input_info={...logininput_info.value}//响应体解包
     // 输入验证
     function validateInput() {
-        const input_info={...logininput_info}//避免多层引用
         if (!input_info.username || !input_info.password) {
             message.info('用户名或密码不能为空');
             return false;
@@ -290,29 +290,28 @@ async function login() {
         if (!validateInput()) {
             return resolve(false);
         }
-        debouncedLogin(resolve);
+        debouncedLogin(input_info,resolve);
     });
 }
 // 注册函数
-async function register() {
-    const register_info={...registerinput_info}//避免多层引用
-    console.log("register:", register_info);
+async function register(input_info) {
+    console.log("register:", input_info);
     try {
-        const res = await axios.post('/auth/register', register_info)//post可以传对象
-
+        const res = await axios.post('/auth/register', input_info)//post可以传对象
         if (!res.data) {
             message.info('用户已注册！')
         }//规定返回data为null则用户已注册
-        if (res.data) {
+        else {
             message.success('注册成功！')
         }
         // 切换到登录模式
         isRegisterMode.value = false
         // 预填充用户名
-        logininput_info.value.username = register_info.value.r_username
-        logininput_info.value.password = register_info.value.r_password
+        logininput_info.value.username = input_info.username
+        logininput_info.value.password = input_info.password
         clear_register()
     } catch (error) {
+        console.log(error)
         message.error(`注册失败！ ${error.response?.data?.message || error.message||''}`);
     }
 }
@@ -322,7 +321,7 @@ async function refreshTokens() {
 
     if (!refreshToken) {
         // 无有效refreshToken，跳转登录
-        // window.location.href = '/login';
+        message.warning('令牌已失效，请重新登录！');
         route.push('/login');
         return;
     }
@@ -341,12 +340,14 @@ async function refreshTokens() {
         }
 
     } catch (error) {
-        if (error.response?.status === 401) { // 可选链操作符避免报错,等价于error.response && error.response.status === 401
-            localStorage.clear();
-            route.push('/login');
+        console.log(error);
+        if (error.response.status === 401) {
+            message.error('登录已过期，请重新登录');
         } else {
-            console.error('非HTTP错误:', error.message);
+            message.error('未知错误，请稍后再试')
         }
+        localStorage.clear();
+        route.push('/login');
     }
 }
 
@@ -362,13 +363,8 @@ function startTokenRefresh(vaild_duration) {
 
         // 如果accessToken不存在或已过期
         if (!accessToken || isTokenExpired(accessToken)) {
-            try {
+            console.log('获取accessToken')
                 await refreshTokens();
-            } catch (error) {
-                console.log(error);
-                message.warn('令牌已失效，请重新登录！');
-                route.push('/login');
-            }
         }
     }, vaild_duration); // 以毫秒为单位
 }
@@ -376,28 +372,29 @@ function startTokenRefresh(vaild_duration) {
 // 注册处理函数
 async function handleRegister(e) {
     e.preventDefault(); // 阻止默认提交行为
+    const input_info={...registerinput_info.value}
     // 输入验证
     function register_validateInput() {
-        if (!usernameRegex.test(registerinput_info.value.r_username)) {
+        if (!usernameRegex.test(input_info.username)) {
             message.error('用户名必须为4-30位字母/汉字/数字/连字符组合，且不能以数字开头');
             return false;
         }
 
-        if (!passwordRegex.test(registerinput_info.value.r_password)) {
+        if (!passwordRegex.test(input_info.password)) {
             message.error('密码必须为8-12位，包含字母和数字，可加特殊字符(!@#$%^&*等)');
             return false;
         }
 
-        if (registerinput_info.value.r_password !== registerinput_info.value.r_confirmPassword) {
+        if (input_info.password !== input_info.confirmPassword) {
             message.error('两次输入的密码不一致')
             return false;
         }
-        if (!registerinput_info.value.r_username || !registerinput_info.value.r_password || 
-            !registerinput_info.value.r_email || !registerinput_info.value.r_confirmPassword) {
+        if (!input_info.username || !input_info.password || 
+            !input_info.email || !input_info.confirmPassword) {
             message.error('请填写所有必填项')
             return false;
         }
-        if (!emailRegex.test(registerinput_info.value.r_email)) {
+        if (!emailRegex.test(input_info.email)) {
             message.error('邮箱格式不正确')
             return false;
         }
@@ -410,7 +407,7 @@ async function handleRegister(e) {
         if (!register_validateInput()) {
             return resolve(false);
         }
-        debouncedRegister( resolve);
+        debouncedRegister(input_info, resolve);
     });
 }
 

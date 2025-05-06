@@ -20,6 +20,9 @@
 import { h, reactive } from 'vue';
 import { MailOutlined, AppstoreOutlined, SettingOutlined } from '@ant-design/icons-vue';
 import login from './views/Login.vue';
+
+import { useStore } from './store';
+const store = useStore();
 function getItem(label, key, icon, children, type) {
   return {
     key,

@@ -32,7 +32,7 @@ class RefreshTokenRequest(BaseModel):
 
 class RegisterRequest(BaseModel):
     username: str
-    email: str = None
+    email: str =None
     password: str
 
 class UserInfoRequest(BaseModel):
@@ -40,15 +40,16 @@ class UserInfoRequest(BaseModel):
 
 # 传入刷新令牌，获取新的访问令牌access_token和刷新令牌refresh_token
 @app.post("/api/auth/refresh")
-async def refresh_token(request: RefreshTokenRequest):
+async def refresh_token(request: RefreshTokenRequest,meta:Request):
     current_refresh_token = request.refresh_token
 
     # 从数据库获取令牌记录（包括哈希值和元数据）
     token_record = db_manager.select(
         table="refresh_tokens",
         conditions={
-            "is_active": True,
-            "expires_at >": datetime.utcnow()
+            "is_active":1,
+            "ip_address":meta.client.host, #获取客户端IP地址
+            "expired_at":{">":datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")}
         }
     )
 
@@ -61,42 +62,35 @@ async def refresh_token(request: RefreshTokenRequest):
     )
 
     if not token_record:
+        print("无效的刷新令牌或已过期")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="无效的刷新令牌或已过期"
         )
 
     user_id = token_record["user_id"]
-
     # 生成新令牌
     new_access_token = generate_access_token({"sub": str(user_id)})
-    new_refresh_token = generate_secure_token()
 
     # 更新数据库（使用事务确保原子性）
     try:
         db_manager.update(
             table="refresh_tokens",
             data={
-                "is_active": False,
-                "revoked_at": datetime.utcnow(),
-                "last_used_at": datetime.utcnow()
+                "user_id": user_id,
+                "token": refresh_token,
+                "token_hash": pwd_context.hash(refresh_token),
+                "is_active": 1,
+                "ip_address":meta.client.host, #获取客户端IP地址
+                "created_at":token_record["created_at"],
+                "expired_at":token_record["expired_at"]
             },
             conditions={"id": token_record["id"]}
         )
-
-        db_manager.insert(
-            table="refresh_tokens",
-            data={
-                "user_id": user_id,
-                "token_hash": pwd_context.hash(new_refresh_token),
-                "expires_at": datetime.utcnow() + timedelta(days=30),
-                "is_active": True
-            }
-        )
-
         db_manager.commit()
     except Exception as e:
         db_manager.rollback()
+        print(f"令牌更新失败: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="令牌更新失败"
@@ -106,7 +100,6 @@ async def refresh_token(request: RefreshTokenRequest):
     return {
         "data": {
             "access_token": new_access_token,
-            "refresh_token": new_refresh_token,
             "token_type": "bearer",
             "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60  # 访问令牌的有效期
         }
@@ -170,7 +163,7 @@ async def register(request: RegisterRequest):
             "username": request.username,
             "email": request.email,
             "password": request.password, # 注意：实际应用中应先哈希密码
-            "created_at":created_at
+            "created_data":created_at
         })
         return {"data": "注册成功"}
     except Exception as e:
