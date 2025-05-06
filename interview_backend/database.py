@@ -9,6 +9,7 @@ from contextlib import contextmanager  # 用于上下文管理器
 class DatabaseManager:
     def __init__(self):
         """初始化数据库连接"""
+        print("开始初始化数据库-----------------------------------------")
         dotenv.load_dotenv()
         self.DB_HOST = os.getenv("DB_HOST")
         self.DB_PASSWORD = os.getenv("DB_PASSWORD")
@@ -18,6 +19,7 @@ class DatabaseManager:
         self.timeout = 20
         
         self.connection = None
+        print("开始连接数据库-----------------------------------------")
         self.connect()
         #self.test_connection()
         
@@ -95,9 +97,11 @@ class DatabaseManager:
 
     def commit(self):
         """提交当前事务"""
+        print("提交当前事务-------------------------------------------")
         try:
             self.connection.commit()
         except pymysql.MySQLError as e:
+            print(f"  提交事务时发生错误: {e}")
             self.connection.rollback()
             raise
 
@@ -159,6 +163,7 @@ class DatabaseManager:
 
     def insert(self, table: str, data: Dict) -> int:
         """安全插入数据"""
+        print("执行插入操作:","插入",data,"到",table,"-------------------------------")
         self._validate_identifier(table)
         columns = ", ".join([self._validate_identifier(col) for col in data.keys()])
         placeholders = ", ".join(["%s"] * len(data))
@@ -167,6 +172,7 @@ class DatabaseManager:
 
     def select(self, table: str, columns: List[str] = ["*"], 
               conditions: Optional[Dict[str, Any]] = None) -> List[Dict]:
+        print("执行查询操作:","从",table,"查询",columns,"条件",conditions,"-------------------------------")
         """安全查询数据"""
         self._validate_identifier(table)
         validated_columns = [self._validate_identifier(col) if col != "*" else "*" 
@@ -185,6 +191,7 @@ class DatabaseManager:
     def update(self, table: str, data: Dict, 
               conditions: Optional[Dict[str, Any]] = None) -> int:
         """安全更新数据"""
+        print("执行更新操作:","更新",data,"到",table,"条件",conditions,"-------------------------------")
         self._validate_identifier(table)
         set_parts = []
         set_params = []
@@ -205,6 +212,7 @@ class DatabaseManager:
 
     def delete(self, table: str, conditions: Dict[str, Any]) -> int:
         """安全删除数据"""
+        print("执行删除操作:","删除",table,"条件",conditions,"-------------------------------")
         self._validate_identifier(table)
         where_clause, params = self._build_where_clause(conditions)
         query = f"DELETE FROM {table} WHERE {where_clause}"

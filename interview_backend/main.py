@@ -1,4 +1,4 @@
-import dotenv  # 用于加载环境变量
+from dotenv import load_dotenv
 import os  # 用于获取环境变量
 
 from fastapi import FastAPI, HTTPException, Request, status
@@ -14,14 +14,17 @@ import secrets #用于生成安全的随机令牌
 from jose import jwt
 
 # 创建实例化对象
+print(">>>>>>>>>>>>>>>>>>>>>加载对象实例<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 app = FastAPI()
 db_manager = DatabaseManager()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")  # 用于密码哈希和验证
 # 配置JWT
-dotenv.load_dotenv()
+load_dotenv()  # 先加载原始 .env
+print(">>>>>>>>>>>>>>>>>>>>>加载环境变量<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
-ACCESS_TOKEN_EXPIRE_MINUTES = os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
+REFRESH_TOKEN_EXPIRE_MINUTES =int(os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES")) 
 
 # 定义 Pydantic 模型
 class RefreshTokenRequest(BaseModel):
@@ -108,17 +111,39 @@ async def refresh_token(request: RefreshTokenRequest):
             "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60  # 访问令牌的有效期
         }
     }
-# 辅助函数：生成安全的随机令牌
-def generate_secure_token(length=64):
-    return secrets.token_urlsafe(length)
+# 辅助函数：生成安全的随机令牌,封装过期时间
+def generate_refresh_token(user_id, length=64):
+    # 生成随机部分
+    token_id = secrets.token_urlsafe(length)
+
+    #计算时间
+    data = datetime.utcnow()
+    expired = data + timedelta(minutes=REFRESH_TOKEN_EXPIRE_MINUTES)
+    
+    # 格式化为 "YYYY-MM-DD HH:MM:SS" 格式
+    data = data.strftime("%Y-%m-%d %H:%M:%S")
+    expired= expired.strftime("%Y-%m-%d %H:%M:%S")
+
+    # 组合 payload（包含过期时间）
+    payload = {
+        "sub": user_id,
+        "jti": token_id,  # token 唯一标识
+        "exp": expired # 过期时间
+    }
+    
+    token = jwt.encode(payload, "SECRET_KEY", algorithm=ALGORITHM )
+    
+    return {"token":token,"created_at":str(data),"expired_at":expired} 
 
 # 辅助函数：生成访问令牌(JWT),data是一个字典，包含要编码的数据（选择要唯一）
 def generate_access_token(data: dict, expires_delta: Optional[timedelta] = None):#None或者timedelta
     to_encode = data.copy()#创建副本，避免直接修改原始数据
+    #datatime.utcnow()默认返回YYYY-MM-DD HH:MM:SS.microseconds格式的时间
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire=expire.strftime("%Y-%m-%d %H:%M:%S")#格式化为 "YYYY-MM-DD HH:MM:SS" 格式
     to_encode.update({"exp": expire})#更新字典的exp键
     #传入三个参数：要封装的数据，加密密钥，加密算法
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -128,27 +153,35 @@ def generate_access_token(data: dict, expires_delta: Optional[timedelta] = None)
 @app.post("/api/auth/register")
 async def register(request: RegisterRequest):
     # 检查用户名是否已存在
+    print("注册:",request)
     existing_user = db_manager.select(
         table="users", 
         conditions={"username": request.username}
     )
+    print("查询用户信息：",existing_user)
     if existing_user:
         return {"data": None}  # 返回None，不返回error
 
     # 插入新用户数据
     try:
+        created_at=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        print("开始注册用户")
         db_manager.insert("users", {
             "username": request.username,
             "email": request.email,
-            "password": request.password  # 注意：实际应用中应先哈希密码
+            "password": request.password, # 注意：实际应用中应先哈希密码
+            "created_at":created_at
         })
         return {"data": "注册成功"}
     except Exception as e:
+        print("注册失败:", e)
         raise HTTPException(status_code=500, detail="用户注册失败")
 
 # 返回令牌，更新用户状态，刷新令牌
 @app.post("/api/auth/login")
-async def login(request: RegisterRequest):
+async def login(request: RegisterRequest,meta: Request):#request使用pydantic模型将json的body自动转换为字典，meta则直接继承原始json对象，用于获取body之外的内容
+    print(">>>>>>>>>>>>>>>>>>>>>登录<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+    print("请求体：：", request)
     # 1. 验证用户是否存在
     users = db_manager.select(
         table="users",
@@ -162,65 +195,75 @@ async def login(request: RegisterRequest):
         )
     
     user = users[0]
-    
-    # 2. 验证密码
-    if not request.password == user["password"]:  # 注意：实际应使用密码哈希验证
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="用户名或密码错误"
-        )
-    
-    # 3. 生成令牌
+    print("登录用户:", user)
+    # 2. 生成令牌
     access_token = generate_access_token({"sub": str(user["id"])})
-    refresh_token = generate_secure_token()
-    
-    # 4. 保存刷新令牌到数据库
+    res=generate_refresh_token(user["id"])
+    refresh_token = res["token"]
+    print("access_token:", access_token)
+    print("refresh_token:", refresh_token)
+    # 3. 保存刷新令牌到数据库
     try:
+        print("开始保存新令牌")
+        print("user_id:", user["id"],"ip_address:",meta.client.host,"created_at:",res["created_at"],"expired_at:",res["expired_at"])
         db_manager.insert(
             table="refresh_tokens",
             data={
                 "user_id": user["id"],
+                "token": refresh_token,
                 "token_hash": pwd_context.hash(refresh_token),
-                "expires_at": datetime.utcnow() + timedelta(days=30),
-                "is_active": True
+                "is_active": 1,
+                "ip_address":meta.client.host, #获取客户端IP地址
+                "created_at":res["created_at"],
+                "expired_at":res["expired_at"]
             }
         )
         db_manager.commit()
     except Exception as e:
+        print("新增令牌失败:", e)
         db_manager.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="登录失败，请重试"
         )
     
-    # 5. 返回响应
-    return {
+    # 4. 返回响应
+    res={
         "data": {
             "access_token": access_token,
             "refresh_token": refresh_token,
             "token_type": "bearer",
-            "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60
+            "expired_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60*1000#  毫秒
         }
     }    
+    print("返回响应:", res)
+    return res
 # 传入查询参数，至少会包括用户名
 @app.get("/api/user/get_info")
 async def get_info(username: str):
+    print(">>>>>>>>>>开始查询用户信息<<<<<<<<<<<<<<<<<")
     # 查询用户信息
     user = db_manager.select(
         table="users",
         conditions={"username": username}
     )
     if not user:
+        print("用户不存在")
         return {"data": None}  # 如果没有找到用户，返回空字典，不返回error
 
     # 返回用户信息（隐藏敏感信息，如密码）
+    print("用户存在")
+    print(user)
     user_info = {
         "username": user[0]["username"],
         "email": user[0]["email"],
         "password": user[0]["password"],  # 注意：实际不应返回密码字段
-        "created_data": user[0].get("created_data")
+        "created_data": user[0]["created_data"].strftime("%Y-%m-%d") if user[0]["created_data"] else None #转换日期格式
     }
-    return {"data": user_info}
+    print(user_info)
+    res={"data": user_info}
+    print("返回用户信息:", res)
+    return res
 
 # 如果通过命令fastapi dev main.py，则不会执行下面的代码
 if __name__ == "__main__":
