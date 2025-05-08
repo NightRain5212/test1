@@ -208,7 +208,7 @@ async function handleUserNotExist(input_info) {
             okText: '是',
             cancelText: '否',
             onOk() {
-                isRegisterMode.value = true; // 切换到注册模式
+                switchMode();  // 切换到注册模式
                 resolve('registered'); // 特殊返回值表示注册成功
             },
             onCancel() {
