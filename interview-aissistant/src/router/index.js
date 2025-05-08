@@ -13,6 +13,12 @@ const routes = [
     name: 'login',
     component: () => import('../views/Login.vue'),
     meta: { requiresAuth: false }
+  },
+    {
+    path: '/myProfile',
+    name: 'myProfileView',//命名，home就可以代指url路径了
+    component: () => import('../views/MyProfile.vue'),
+    meta: { requiresAuth: true }
   }
 ]
 
@@ -26,12 +32,24 @@ const router = createRouter({
 })
 //每个路由跳转前都会执行这个函数
 router.beforeEach((to, from, next) => {
-  if(!localStorage.getItem('token')){
-    if(to.meta.requiresAuth){//如果需要验证登录状态，并且没有token，那么就跳转到登录页面
-      next('/login')
-    }
+  const token = localStorage.getItem('accessToken');
+  const isAuthenticated = !!token; // 明确转换为布尔值
+  
+  // 情况1：访问需要认证但未登录的路由
+  if (to.matched.some(record => record.meta.requiresAuth) && !isAuthenticated) {
+    return next({ 
+      path: '/login',
+      query: { redirect: to.fullPath } // 保存目标路由便于登录后跳转
+    });
   }
-  next()//进入下一个路由
-})
+
+  // 情况2：已登录但访问登录页（重定向到首页）
+  if (isAuthenticated && to.path === '/login') {
+    return next('/');
+  }
+
+  // 其他情况正常放行
+  next();
+});
 
 export default router

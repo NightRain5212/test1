@@ -1,16 +1,17 @@
 <template>
   <div class="main-content">
     <div class="left-main-menu">
-      <a-menu v-model:selectedKeys="state.selectedKeys" mode="inline" :open-keys="state.openKeys" :items="items"
-        @openChange="onOpenChange"></a-menu>
+      <a-menu
+        v-model:selectedKeys="menuState.selectedKeys"
+        mode="inline"
+        :open-keys="menuState.openKeys"
+        :items="items"
+        @openChange="onOpenChange"
+        @select="handleMenuSelect"
+      />
     </div>
-    <!-- <div v-if="state.selectedKeys[0]=='1.1'">
-      <routeLink to="/views/HomeView.vue">
-        <router-view></router-view>
-      </routeLink>
-    </div> -->
     <div class="right-main-content">
-      <login></login>
+      <router-view />
     </div>
   </div>
 </template>
@@ -19,55 +20,62 @@
 //左侧主菜单
 import { h, reactive } from 'vue';
 import { MailOutlined, AppstoreOutlined, SettingOutlined } from '@ant-design/icons-vue';
-import login from './views/Login.vue';
-
+import { useRouter } from 'vue-router';
 import { useStore } from './store';
 const store = useStore();
-function getItem(label, key, icon, children, type) {
-  return {
-    key,
-    icon,
-    children,
-    label,
-    type,
-  };
-}
-const items = reactive([
-  getItem('主页', 'sub1', () => h(MailOutlined), [
-    getItem('开始', '1.1'),
-    getItem('报告', '1.2'),
-  ]),
-  getItem('历史', 'sub2', () => h(AppstoreOutlined), [
-    getItem('Option 5', '5'),
-    getItem('Option 6', '6'),
-    getItem('Submenu', 'sub3', null, [getItem('Option 7', '7'), getItem('Option 8', '8')]),
-  ]),
-    getItem('设置', 'sub3', () => h(AppstoreOutlined), [
-    getItem('Option 5', '5'),
-    getItem('Option 6', '6'),
-    getItem('Submenu', 'sub6', null, [getItem('Option 7', '7'), getItem('Option 8', '8')]),
-  ]),
-  getItem('关于我们', 'sub4', () => h(SettingOutlined), [
-    getItem('Option 9', '9'),
-    getItem('Option 10', '10'),
-    getItem('Option 11', '11'),
-    getItem('Option 12', '12'),
-  ]),
-]);
-const state = reactive({
-  rootSubmenuKeys: ['sub1', 'sub2', 'sub3','sub4'],
-  openKeys: ['sub1'],
-  selectedKeys: [],
+const router = useRouter();
+// 菜单项生成器
+const getMenuItem = (label, key, icon = null, children = null) => ({
+  key,
+  icon,
+  children,
+  label
 });
-const onOpenChange = openKeys => {
-  const latestOpenKey = openKeys.find(key => state.openKeys.indexOf(key) === -1);
-  if (state.rootSubmenuKeys.indexOf(latestOpenKey) === -1) {
-    state.openKeys = openKeys;
-  } else {
-    state.openKeys = latestOpenKey ? [latestOpenKey] : [];
-  }
+
+// 菜单配置
+const items = reactive([
+  getMenuItem('主页', 'sub1', () => h(MailOutlined), [//MailOutlined是ant-design-vue的图标
+    getMenuItem('开始', '/'),  // 直接使用路由路径作为key
+    getMenuItem('报告', '/login'),
+  ]),
+  getMenuItem('历史', 'sub2', () => h(AppstoreOutlined), [
+    getMenuItem('Option 5', '2.1'),
+    getMenuItem('Option 6', '2.2'),
+  ]),
+  getMenuItem('设置', 'sub3', () => h(AppstoreOutlined), [
+    getMenuItem('Option 5', '3.1'),
+    getMenuItem('Option 6', '3.2'),
+  ]),
+  getMenuItem('关于我们', 'sub4', () => h(SettingOutlined), [
+    getMenuItem('Option 9', '4.1'),
+    getMenuItem('Option 10', '4.2'),
+  ]),
+    getMenuItem('我的', '/myProfile', () => h(SettingOutlined), []),
+]);
+
+// 菜单状态管理
+const menuState = reactive({
+  openKeys: ['sub1'],
+  selectedKeys: []
+});
+
+// 菜单展开/收起逻辑
+const rootSubmenuKeys = ['sub1', 'sub2', 'sub3', 'sub4','myProfile'];
+//主要为了实现菜单的特效
+const onOpenChange = (openKeys) => {
+  const latestOpenKey = openKeys.find(key => !menuState.openKeys.includes(key));
+  menuState.openKeys = latestOpenKey && rootSubmenuKeys.includes(latestOpenKey) 
+    ? [latestOpenKey] 
+    : openKeys;
 };
 
+// 菜单项选择处理
+const handleMenuSelect = ({ key }) => {
+  if (key.startsWith('/')) {
+    router.push(key);
+    menuState.selectedKeys = [key];
+  }
+};
 </script>
 
 <style scoped lang="scss">/*使用scss,允许嵌套类*/
