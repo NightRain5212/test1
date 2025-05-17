@@ -26,18 +26,38 @@
           <a-slider v-model:value="sliderValue" :min="0" :max="100" />
         </div>
       </div>
+      <button @click="saveRecording" class="btn">
+        保存
+      </button>
     </div>
   </div>
+
+  <!-- vue提供组件---将模态框渲染到 body 末尾 -->
+  <Teleport to="body">
+    <div v-if="showText" class="modal-mask">
+      <div class="modal-header"></div>
+      <div class="modal-content">
+        <p>录像未保存，确认关闭摄像头？</p>
+      </div>
+      <div class="modal-footer">
+        <button @click="saveRecording" class="btn">保存</button>
+        <button @click="showModal = false" class="btn">取消</button>
+        <button @click="stopCamera()" class="btn">关闭</button>
+      </div>
+    </div>
+  </Teleport>
 </template>
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
-
+//弹出框
+const showText = ref(false);
+//摄像相关
 const isCameraActive = ref(false)
 const cameraVideo = ref(null)
 const sliderValue = ref(30) // 默认设为中间值
 let cameraStream = null
 let audioContext = null
-let gainNode = null// 用于控制音量
+let gainNode = null// 浏览器内置的音频处理节点
 let microphone = null// 用于连接麦克风
 
 // 监听滑块值变化
@@ -51,11 +71,11 @@ function updateVolume(value) {
 }
 async function toggleCamera() {
   if (isCameraActive.value) {
+showText.value = true;
     stopCamera()
   } else {
    await startCamera()
   }
-
 }
 async function startCamera() {
   try {
@@ -88,24 +108,23 @@ async function startCamera() {
 }
 
 function stopCamera() {
-  if (cameraStream) {
-    cameraStream.getTracks().forEach(track => track.stop())
-    
-    // 断开音频节点
-    if (microphone && gainNode) {
-      microphone.disconnect()
-      gainNode.disconnect()
-    }
-    
-    if (audioContext) {
-      audioContext.close()
-    }
+  // 断开音频节点
+  if (microphone && gainNode) {
+    microphone.disconnect()
+    gainNode.disconnect()
   }
-  
+
+  if (audioContext) {
+    audioContext.close()
+  }
+  if (cameraStream) {
+    // 停止流中的所有轨道
+    cameraStream.getTracks().forEach(track => track.stop())
+  }
+
   if (cameraVideo.value) {
     cameraVideo.value.srcObject = null
   }
-  
   isCameraActive.value = false
   cameraStream = null
   audioContext = null
@@ -116,6 +135,10 @@ function stopCamera() {
 onBeforeUnmount(() => {
   stopCamera()
 })
+//保存
+function saveRecording() { 
+  console.log('保存');
+}
 </script>
 <style scoped lang="scss">
 .home {
@@ -135,13 +158,15 @@ onBeforeUnmount(() => {
   justify-content: center;
   align-items: center;
   
-  .camera {
-    width: 80%;
-    height: 80%;
-    object-fit: cover; // 填充整个区域
-    background: #000;
-    transform: scaleX(-1); // 镜像翻转（使画面更自然）
-  }
+.camera {
+  width: 80%;
+  height: auto; /* 高度自适应 */
+  aspect-ratio: 16/9; /* 固定宽高比（常用摄像头比例） */
+  object-fit: contain; /* 改为contain以完整显示画面 */
+  background: #000;
+  transform: scaleX(-1);
+  margin: 0 auto; /* 水平居中 */
+}
   
   .placeholder {
     color: #666;
@@ -161,7 +186,7 @@ onBeforeUnmount(() => {
 
 .btn {
   background: rgb(234, 230, 230);
-  width: 100%;
+  width: auto;
   height: 40px;
   border: none;
   border-radius: 4px;
@@ -197,4 +222,36 @@ onBeforeUnmount(() => {
     margin: 0;
   }
 }
+.modal-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 300px;
+  height: 150px;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+  .model-header {
+    background: #000;
+    height:20px;
+    width: 100%;
+  }
+.modal-content {
+  background: white;
+}
+.modal-footer {
+  display: flex;
+  flex-direction: row; /* 明确指定横向排列（其实flex默认就是row） */
+  justify-content: space-between; /* 均匀分布子元素 */
+  width: 100%; /* 确保父容器占满可用空间 */
+  gap: 0; /* 明确消除子元素间隙 */
+  height:45px;
+}
+.modal-footer > * {
+  box-sizing: border-box; /* 防止padding影响宽度计算 */
+}
+}
+
 </style>

@@ -1,6 +1,10 @@
 <template>
     <div class="main_all">
-        黑子
+        <a-avatar :size="64">
+            <template #icon>
+                <UserOutlined />
+            </template>
+        </a-avatar>
     </div>
 </template>
 <script setup>
@@ -9,6 +13,6 @@
 .main_all {
     width: 100%;
     height: 100%;
-    background-color: #4bb1bd; 
+    background-color: #cddadc; 
 }
 </style>

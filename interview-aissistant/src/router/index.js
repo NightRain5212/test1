@@ -16,8 +16,14 @@ const routes = [
   },
     {
     path: '/myProfile',
-    name: 'myProfileView',//命名，home就可以代指url路径了
+    name: 'myProfile',//命名，home就可以代指url路径了
     component: () => import('../views/MyProfile.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/settings',
+    name: 'settingsView',//命名，home就可以代指url路径了
+    component: () => import('../views/SettingsView.vue'),
     meta: { requiresAuth: true }
   }
 ]
@@ -33,6 +39,7 @@ const router = createRouter({
 //每个路由跳转前都会执行这个函数
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('accessToken');
+  console.log('获取token',token)
   const isAuthenticated = !!token; // 明确转换为布尔值
   
   // 情况1：访问需要认证但未登录的路由

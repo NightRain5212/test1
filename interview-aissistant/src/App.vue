@@ -1,9 +1,15 @@
 <template>
   <div class="main-content">
-    <div class="left-main-menu">
+    <div 
+      class="left-main-menu"
+      ref="sidebar"
+      :style="{ width: sidebarWidth + 'px' }"
+    >
+      <div class="drag-handle" @mousedown="startDrag"></div>
       <a-menu
         v-model:selectedKeys="menuState.selectedKeys"
         mode="inline"
+        :inlineCollapsed="collapsed"
         :open-keys="menuState.openKeys"
         :items="items"
         @openChange="onOpenChange"
@@ -16,10 +22,22 @@
   </div>
 </template>
 <script setup>
-/ ---------------------------------------------------------------*/
+// ---------------------------------------------------------------*/
 //左侧主菜单
-import { h, reactive } from 'vue';
-import { MailOutlined, AppstoreOutlined, SettingOutlined } from '@ant-design/icons-vue';
+import { h, reactive,ref,onUnmounted } from 'vue';
+import {
+  HomeOutlined,
+  PlayCircleOutlined,
+  FileTextOutlined,
+  HistoryOutlined,       // 替代 ClockCircleOutlined
+  UnorderedListOutlined,
+   SettingOutlined,
+  OrderedListOutlined,
+  TeamOutlined,
+  InfoCircleOutlined,
+  QuestionCircleOutlined,
+  UserOutlined
+} from '@ant-design/icons-vue';
 import { useRouter } from 'vue-router';
 import { useStore } from './store';
 const store = useStore();
@@ -34,23 +52,20 @@ const getMenuItem = (label, key, icon = null, children = null) => ({
 
 // 菜单配置
 const items = reactive([
-  getMenuItem('主页', 'sub1', () => h(MailOutlined), [//MailOutlined是ant-design-vue的图标
-    getMenuItem('开始', '/'),  // 直接使用路由路径作为key
-    getMenuItem('报告', '/login'),
+  getMenuItem('主页', 'sub1', () => h(HomeOutlined), [
+    getMenuItem('开始', '/', () => h(PlayCircleOutlined)),
+    getMenuItem('报告', '1.3', () => h(FileTextOutlined)),
   ]),
-  getMenuItem('历史', 'sub2', () => h(AppstoreOutlined), [
-    getMenuItem('Option 5', '2.1'),
-    getMenuItem('Option 6', '2.2'),
+  getMenuItem('历史', 'sub2', () => h(HistoryOutlined), [  // 改用 HistoryOutlined
+    getMenuItem('Option 5', '2.1', () => h(UnorderedListOutlined)),
+    getMenuItem('Option 6', '2.2', () => h(OrderedListOutlined)),
   ]),
-  getMenuItem('设置', 'sub3', () => h(AppstoreOutlined), [
-    getMenuItem('Option 5', '3.1'),
-    getMenuItem('Option 6', '3.2'),
+  getMenuItem('设置', '/settings', () => h(SettingOutlined)), // 正确名称是 SettingOutlined
+  getMenuItem('关于我们', 'sub4', () => h(TeamOutlined), [
+    getMenuItem('Option 9', '4.1', () => h(InfoCircleOutlined)),
+    getMenuItem('Option 10', '4.2', () => h(QuestionCircleOutlined)),
   ]),
-  getMenuItem('关于我们', 'sub4', () => h(SettingOutlined), [
-    getMenuItem('Option 9', '4.1'),
-    getMenuItem('Option 10', '4.2'),
-  ]),
-    getMenuItem('我的', '/myProfile', () => h(SettingOutlined), []),
+  getMenuItem('我的', '/myProfile', () => h(UserOutlined)),
 ]);
 
 // 菜单状态管理
@@ -60,7 +75,7 @@ const menuState = reactive({
 });
 
 // 菜单展开/收起逻辑
-const rootSubmenuKeys = ['sub1', 'sub2', 'sub3', 'sub4','myProfile'];
+const rootSubmenuKeys = ['sub1', 'sub2', 'sub4'];// 移除项则不再可展开
 //主要为了实现菜单的特效
 const onOpenChange = (openKeys) => {
   const latestOpenKey = openKeys.find(key => !menuState.openKeys.includes(key));
@@ -76,6 +91,54 @@ const handleMenuSelect = ({ key }) => {
     menuState.selectedKeys = [key];
   }
 };
+
+// 侧边栏拖动逻辑
+const sidebarWidth = ref(200); // 初始宽度
+const minWidth = 70; // 最小宽度(只显示图标)
+const maxWidth = 200; // 最大宽度
+const isDragging = ref(false);
+const startX = ref(0);
+const startWidth = ref(0);
+const sidebar = ref(null);
+const collapsed = ref(false);
+
+const startDrag = (e) => {
+  isDragging.value = true;
+  startX.value = e.clientX;
+  startWidth.value = sidebarWidth.value;
+  document.addEventListener('mousemove', handleDrag);
+  document.addEventListener('mouseup', stopDrag);
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+};
+
+const handleDrag = (e) => {
+  if (!isDragging.value) return;
+  const dx = e.clientX - startX.value;
+  let newWidth = startWidth.value + dx;
+  
+  // 限制宽度范围
+  newWidth = Math.max(minWidth, Math.min(newWidth, maxWidth));
+  
+  sidebarWidth.value = newWidth;
+//宽度过小时，自动折叠
+  if (sidebarWidth.value < minWidth) collapsed.value = true;
+  else collapsed.value = false;
+};
+
+const stopDrag = () => {
+  isDragging.value = false;
+  document.removeEventListener('mousemove', handleDrag);
+  document.removeEventListener('mouseup', stopDrag);
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
+};
+
+// 清理事件监听器
+onUnmounted(() => {
+  document.removeEventListener('mousemove', handleDrag);
+  document.removeEventListener('mouseup', stopDrag);
+});
 </script>
 
 <style scoped lang="scss">/*使用scss,允许嵌套类*/
@@ -91,20 +154,34 @@ const handleMenuSelect = ({ key }) => {
   font-family: "Poppins", sans-serif;
   display: flex; /* 只需要写一次 */
 }
-
 .left-main-menu {
-  flex: 2;  /* 占1份 */
+  position: relative;
+  height: 100%;
+  border-right: 1px solid #f0f0f0;
+  background: #fff;
+  transition: width 0.2s;
+  flex-shrink: 0;//防止收缩
+  overflow: hidden;//溢出隐藏
+}
+
+.drag-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize;
+  z-index: 1;
+  
+  &:hover {
+    background-color: rgba(24, 144, 255, 0.1);
+  }
 }
 
 .right-main-content {
-  flex: 9;  /* 占9份 */
-}
-
-.left-main-menu {
+  overflow: auto;
   height: 100%;
-  border-left: 0;
-  display: flex;
-  overflow: auto; /* 允许菜单滚动 */
+  flex:1;//这里是指占据剩余的空间
 }
 
 </style>
