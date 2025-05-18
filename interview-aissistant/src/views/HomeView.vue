@@ -29,6 +29,18 @@
       <button @click="saveRecording" class="btn">
         保存
       </button>
+          <button 
+      @click="isRecording ? stopRecording() : startRecording()" 
+      class="btn"
+      :class="{ 'recording': isRecording }"
+    >
+      {{ isRecording ? '停止录制' : '开始录制' }}
+    </button>
+    
+    <!-- 显示录制时长 -->
+    <div v-if="isRecording" class="recording-duration">
+      {{ recordingDuration }}
+    </div>
     </div>
   </div>
 
@@ -50,6 +62,7 @@
   </Teleport>
 </template>
 <script setup>
+import { message } from 'ant-design-vue'
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 //弹出框
 const showText = ref(false);
@@ -57,10 +70,20 @@ const showText = ref(false);
 const isCameraActive = ref(false)
 const cameraVideo = ref(null)
 const sliderValue = ref(30) // 默认设为中间值
+
+// 添加录制相关的状态
+const mediaRecorder = ref(null)
+const recordedChunks = ref([])
+const isRecording = ref(false)
+const recordingStartTime = ref(null)
+const recordingDuration = ref('00:00')
+let recordingTimer = null
+
 let cameraStream = null
 let audioContext = null
 let gainNode = null// 浏览器内置的音频处理节点
 let microphone = null// 用于连接麦克风
+
 
 // 监听滑块值变化
 watch(sliderValue, (newVal) => {
@@ -137,10 +160,10 @@ function stopCamera() {
 onBeforeUnmount(() => {
   stopCamera()
 })
-// //保存
-function saveRecording() { 
-  console.log('保存');
-}
+// // //保存
+// function saveRecording() { 
+//   console.log('保存');
+// }
 
 
 // 处理模态框关闭
@@ -180,6 +203,107 @@ async function saveAndClose() {
 //   }
 // }
 
+// 开始录制函数
+function startRecording() {
+  if (!cameraStream) {
+    message.error('请先开启摄像头')
+    return
+  }
+
+  try {
+    recordedChunks.value = []
+    mediaRecorder.value = new MediaRecorder(cameraStream)
+    
+    mediaRecorder.value.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        recordedChunks.value.push(event.data)
+      }
+    }
+
+    mediaRecorder.value.start(200) // 每200ms记录一次数据
+    isRecording.value = true
+    recordingStartTime.value = Date.now()
+    updateRecordingDuration()
+    message.success('开始录制')
+  } catch (error) {
+    console.error('录制失败:', error)
+    message.error('录制失败')
+  }
+}
+
+// 停止录制
+function stopRecording() {
+  if (mediaRecorder.value && mediaRecorder.value.state !== 'inactive') {
+    mediaRecorder.value.stop()
+    isRecording.value = false
+    clearInterval(recordingTimer)
+    message.success('录制已停止')
+  }
+}
+
+// 更新录制时长
+function updateRecordingDuration() {
+  recordingTimer = setInterval(() => {
+    const duration = Math.floor((Date.now() - recordingStartTime.value) / 1000)
+    const minutes = Math.floor(duration / 60).toString().padStart(2, '0')
+    const seconds = (duration % 60).toString().padStart(2, '0')
+    recordingDuration.value = `${minutes}:${seconds}`
+  }, 1000)
+}
+
+// 保存录像函数
+async function saveRecording() {
+  if (recordedChunks.value.length === 0) {
+    message.warning('没有可保存的录像')
+    return
+  }
+
+  try {
+    // 停止录制
+    if (isRecording.value) {
+      stopRecording()
+    }
+
+    // 创建Blob对象
+    const blob = new Blob(recordedChunks.value, {
+      type: 'video/webm'
+    })
+
+    // 生成下载链接
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    a.href = url
+    a.download = `recording-${timestamp}.webm`
+    
+    // 触发下载
+    document.body.appendChild(a)
+    a.click()
+    
+    // 清理
+    setTimeout(() => {
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      recordedChunks.value = []
+    }, 100)
+
+    message.success('录像已保存')
+    return true
+  } catch (error) {
+    console.error('保存失败:', error)
+    message.error('保存失败')
+    return false
+  }
+}
+
+// 组件卸载时清理
+onBeforeUnmount(() => {
+  stopRecording()
+  stopCamera()
+  if (recordingTimer) {
+    clearInterval(recordingTimer)
+  }
+})
 </script>
 
 
@@ -386,4 +510,28 @@ async function saveAndClose() {
   }
 }
 
+.btn {
+  &.recording {
+    background: #ff4d4f;
+    color: white;
+    
+    &:hover {
+      background: #ff7875;
+    }
+    
+    &:active {
+      background: #d9363e;
+    }
+  }
+}
+
+.recording-duration {
+  color: #fff;
+  text-align: center;
+  font-size: 1.2rem;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  margin: 8px 0;
+}
 </style>
