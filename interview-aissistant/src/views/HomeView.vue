@@ -35,14 +35,16 @@
   <!-- vue提供组件---将模态框渲染到 body 末尾 -->
   <Teleport to="body">
     <div v-if="showText" class="modal-mask">
-      <div class="modal-header"></div>
+      <div class="modal-header">
+        <h3>提示</h3>
+      </div>
       <div class="modal-content">
         <p>录像未保存，确认关闭摄像头？</p>
       </div>
       <div class="modal-footer">
-        <button @click="saveRecording" class="btn">保存</button>
-        <button @click="showModal = false" class="btn">取消</button>
-        <button @click="stopCamera()" class="btn">关闭</button>
+        <button @click="saveAndClose" class="btn default">保存</button>
+        <button @click="Close(false)" class="btn primary">取消</button>
+        <button @click="Close(true)" class="btn danger">关闭</button>
       </div>
     </div>
   </Teleport>
@@ -135,11 +137,52 @@ function stopCamera() {
 onBeforeUnmount(() => {
   stopCamera()
 })
-//保存
+// //保存
 function saveRecording() { 
   console.log('保存');
 }
+
+
+// 处理模态框关闭
+function Close(forceClose = false) {
+  if (forceClose) {
+    stopCamera();
+    showText.value = false;
+  } else {
+    showText.value = false;
+  }
+}
+
+// 处理保存并关闭
+async function saveAndClose() {
+  try {
+    await saveRecording();
+    stopCamera();
+    showText.value = false;
+    message.success('录像已保存');
+  } catch (error) {
+    message.error('保存失败');
+    console.error('保存失败:', error);
+  }
+}
+
+// // 更新关闭摄像头逻辑
+// async function toggleCamera() {
+//   if (isCameraActive.value) {
+//     // 如果有未保存的录像，显示确认框
+//     if (hasUnsavedRecording) {
+//       showText.value = true;
+//     } else {
+//       stopCamera();
+//     }
+//   } else {
+//     await startCamera();
+//   }
+// }
+
 </script>
+
+
 <style scoped lang="scss">
 .home {
   display: flex;
@@ -224,34 +267,123 @@ function saveRecording() {
 }
 .modal-mask {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 300px;
-  height: 150px;
-  background: rgba(0,0,0,0.5);
+  // top: 0;
+  // left: 0;
+  // width: 300px;
+  // height: 150px;
+  // background: rgba(0,0,0,0.5);
+  // display: flex;
+  // justify-content: center;
+  // align-items: center;
+  // z-index: 999;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 360px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
   display: flex;
-  justify-content: center;
-  align-items: center;
+  flex-direction: column;
   z-index: 999;
-  .model-header {
-    background: #000;
-    height:20px;
+  .modal-header {
+    background: #f5f5f5;
+    height: 48px;
     width: 100%;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    border-bottom: 1px solid #e8e8e8;
+    
+    h3 {
+      margin: 0;
+      color: #262626;
+      font-size: 16px;
+    }
   }
-.modal-content {
-  background: white;
-}
+  .modal-content {
+    padding: 24px;
+    background: white;
+    
+    p {
+      margin: 0;
+      color: #595959;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+  }
+// .modal-footer {
+//   display: flex;
+//   flex-direction: row; /* 明确指定横向排列（其实flex默认就是row） */
+//   justify-content: space-between; /* 均匀分布子元素 */
+//   width: 100%; /* 确保父容器占满可用空间 */
+//   gap: 0; /* 明确消除子元素间隙 */
+//   height:45px;
+// }
+// .modal-footer > * {
+//   box-sizing: border-box; /* 防止padding影响宽度计算 */
+  
+// }
 .modal-footer {
-  display: flex;
-  flex-direction: row; /* 明确指定横向排列（其实flex默认就是row） */
-  justify-content: space-between; /* 均匀分布子元素 */
-  width: 100%; /* 确保父容器占满可用空间 */
-  gap: 0; /* 明确消除子元素间隙 */
-  height:45px;
-}
-.modal-footer > * {
-  box-sizing: border-box; /* 防止padding影响宽度计算 */
-}
+    padding: 12px 16px;
+    background: #f5f5f5;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    border-top: 1px solid #e8e8e8;
+
+    .btn {
+      min-width: 80px;
+      height: 32px;
+      font-size: 14px;
+      padding: 0 15px;
+      border-radius: 4px;
+      transition: all 0.3s;
+      
+      &.primary {
+        background: #1890ff;
+        color: white;
+        
+        &:hover {
+          background: #40a9ff;
+        }
+        
+        &:active {
+          background: #096dd9;
+        }
+      }
+      
+      &.default {
+        background: white;
+        border: 1px solid #d9d9d9;
+        color: #595959;
+        
+        &:hover {
+          border-color: #40a9ff;
+          color: #40a9ff;
+        }
+        
+        &:active {
+          border-color: #096dd9;
+          color: #096dd9;
+        }
+      }
+      
+      &.danger {
+        background: #ff4d4f;
+        color: white;
+        
+        &:hover {
+          background: #ff7875;
+        }
+        
+        &:active {
+          background: #d9363e;
+        }
+      }
+    }
+  }
 }
 
 </style>
