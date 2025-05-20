@@ -1,13 +1,24 @@
 <template>
-  <div class="home">
+  <!-- 用于显示模态框的时候判断鼠标点击是否有效 -->
+  <div class="home"  :style="{ 'pointer-events': isModalOpen ? 'none' : 'auto' }">
     <div class="viewarea">
       <!-- 摄像头视频显示区域 -->
       <video ref="cameraVideo" autoplay muted class="camera" v-show="isCameraActive"></video>
       <div v-show="!isCameraActive" class="placeholder">摄像头未开启</div>
     </div>
     <div class="controlarea">
-      <button @click="toggleCamera" class="btn">
+      <button @click="toggleCamera" class="btn1">
         {{ isCameraActive ? '关闭摄像头' : '开启摄像头' }}
+      </button>
+      <button @click="toggleRecording" class="btn1" v-if="isCameraActive" :class="{ 'recording': isRecording }">
+        {{ isRecording ? '停止录制' : '开始录制' }}
+      </button>
+      <!-- 显示录制时长 -->
+      <div v-if="isRecording" class="recording-duration">
+        {{ recordingDuration }}
+      </div>
+      <button v-if="isCameraActive" class="btn1" @click="saveRecording">
+        保存
       </button>
       <div class="sound-slider">
         <div class="icon">
@@ -26,37 +37,21 @@
           <a-slider v-model:value="sliderValue" :min="0" :max="100" />
         </div>
       </div>
-      <button @click="saveRecording" class="btn">
-        保存
-      </button>
-          <button 
-      @click="isRecording ? stopRecording() : startRecording()" 
-      class="btn"
-      :class="{ 'recording': isRecording }"
-    >
-      {{ isRecording ? '停止录制' : '开始录制' }}
-    </button>
-    
-    <!-- 显示录制时长 -->
-    <div v-if="isRecording" class="recording-duration">
-      {{ recordingDuration }}
-    </div>
     </div>
   </div>
-
   <!-- vue提供组件---将模态框渲染到 body 末尾 -->
   <Teleport to="body">
-    <div v-if="showText" class="modal-mask">
+    <!-- 内容区域启用指针事件 -->
+    <div v-if="isModalOpen" class="modal-mask" style="pointer-events: auto;" @click.stop>
       <div class="modal-header">
         <h3>提示</h3>
       </div>
       <div class="modal-content">
-        <p>录像未保存，确认关闭摄像头？</p>
+        <p>{{ currentModal.message }}</p>
       </div>
       <div class="modal-footer">
-        <button @click="saveAndClose" class="btn default">保存</button>
-        <button @click="Close(false)" class="btn primary">取消</button>
-        <button @click="Close(true)" class="btn danger">关闭</button>
+        <button @click="handleConfirm" class="btn confirm">是</button>
+        <button @click="handleCancel" class="btn cancle">否</button>
       </div>
     </div>
   </Teleport>
@@ -64,8 +59,6 @@
 <script setup>
 import { message } from 'ant-design-vue'
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
-//弹出框
-const showText = ref(false);
 //摄像相关
 const isCameraActive = ref(false)
 const cameraVideo = ref(null)
@@ -78,13 +71,14 @@ const isRecording = ref(false)
 const recordingStartTime = ref(null)
 const recordingDuration = ref('00:00')
 let recordingTimer = null
+const islatest_save = ref(false);//最新的录像是否保存
 
 let cameraStream = null
 let audioContext = null
 let gainNode = null// 浏览器内置的音频处理节点
 let microphone = null// 用于连接麦克风
 
-
+//声音相关
 // 监听滑块值变化
 watch(sliderValue, (newVal) => {
   updateVolume(newVal)
@@ -94,12 +88,15 @@ function updateVolume(value) {
   const volume = value / 100// 将滑块值(0-100)转换为音量系数(0-1)
   gainNode.gain.value = volume
 }
+//摄像头相关
 async function toggleCamera() {
   if (isCameraActive.value) {
-showText.value = true;
-    stopCamera()
+    if(!islatest_save.value){
+      addModal({ message: '录像未保存，是否保存录像？', onConfirm: saveRecording });
+    }
+    addModal({ message: '是否关闭摄像头？', onConfirm: stopCamera });
   } else {
-   await startCamera()
+    await startCamera()
   }
 }
 async function startCamera() {
@@ -131,7 +128,6 @@ async function startCamera() {
     console.error('设备访问错误:', error)
   }
 }
-
 function stopCamera() {
   // 断开音频节点
   if (microphone && gainNode) {
@@ -150,59 +146,22 @@ function stopCamera() {
   if (cameraVideo.value) {
     cameraVideo.value.srcObject = null
   }
+  stopRecording();
   isCameraActive.value = false
   cameraStream = null
   audioContext = null
   gainNode = null
   microphone = null
 }
-
-onBeforeUnmount(() => {
-  stopCamera()
-})
-// // //保存
-// function saveRecording() { 
-//   console.log('保存');
-// }
-
-
-// 处理模态框关闭
-function Close(forceClose = false) {
-  if (forceClose) {
-    stopCamera();
-    showText.value = false;
-  } else {
-    showText.value = false;
+//录像相关
+function toggleRecording() {
+  if(isRecording.value){
+    stopRecording()
+    addModal({ message: '是否保存录像？', onConfirm: saveRecording });
+  }else{
+    startRecording()
   }
 }
-
-// 处理保存并关闭
-async function saveAndClose() {
-  try {
-    await saveRecording();
-    stopCamera();
-    showText.value = false;
-    message.success('录像已保存');
-  } catch (error) {
-    message.error('保存失败');
-    console.error('保存失败:', error);
-  }
-}
-
-// // 更新关闭摄像头逻辑
-// async function toggleCamera() {
-//   if (isCameraActive.value) {
-//     // 如果有未保存的录像，显示确认框
-//     if (hasUnsavedRecording) {
-//       showText.value = true;
-//     } else {
-//       stopCamera();
-//     }
-//   } else {
-//     await startCamera();
-//   }
-// }
-
 // 开始录制函数
 function startRecording() {
   if (!cameraStream) {
@@ -229,10 +188,10 @@ function startRecording() {
     console.error('录制失败:', error)
     message.error('录制失败')
   }
-}
+} 
 
 // 停止录制
-function stopRecording() {
+function stopRecording(){
   if (mediaRecorder.value && mediaRecorder.value.state !== 'inactive') {
     mediaRecorder.value.stop()
     isRecording.value = false
@@ -259,10 +218,10 @@ async function saveRecording() {
   }
 
   try {
-    // 停止录制
-    if (isRecording.value) {
-      stopRecording()
-    }
+    // // 停止录制
+    // if (isRecording.value) {
+    //   stopRecording()
+    // }
 
     // 创建Blob对象
     const blob = new Blob(recordedChunks.value, {
@@ -304,8 +263,77 @@ onBeforeUnmount(() => {
     clearInterval(recordingTimer)
   }
 })
-</script>
 
+//弹窗队列相关
+// 状态
+const modalQueue = ref([]);
+const currentModal = ref(null);
+const isModalOpen = ref(false);
+
+// 方法
+const addModal = (modalConfig) => {
+  modalQueue.value.push(modalConfig);
+  if (!currentModal.value) showNextModal();
+};
+
+const showNextModal = () => {
+  if (modalQueue.value.length === 0) {
+    currentModal.value = null;
+    isModalOpen.value = false;
+    return;
+  }
+  currentModal.value = modalQueue.value.shift();
+  isModalOpen.value = true;
+};
+
+const handleConfirm = () => {
+  currentModal.value?.onConfirm?.();
+  showNextModal();
+};
+
+const handleCancel = () => {
+  currentModal.value?.onCancel?.();
+  showNextModal();
+};
+
+// // 处理模态框关闭
+// function Close(forceClose = false) {
+//   if (forceClose) {
+//     stopCamera();
+//     showText1.value = false;
+//   } else {
+//     showText1.value = false;
+//   }
+// }
+
+// // 处理保存并关闭
+// async function saveAndClose() {
+//   try {
+//     await saveRecording();
+//     stopCamera();
+//     showText1.value = false;
+//     message.success('录像已保存');
+//   } catch (error) {
+//     message.error('保存失败');
+//     console.error('保存失败:', error);
+//   }
+//   stopCamera();
+// }
+
+// // 更新关闭摄像头逻辑
+// async function toggleCamera() {
+//   if (isCameraActive.value) {
+//     // 如果有未保存的录像，显示确认框
+//    if (hasUnsavedRecording) {
+//       showText1.value = true;
+//     } else {
+//       stopCamera();
+//     }
+//   } else {
+//     await startCamera();
+//   }
+// }
+</script>
 
 <style scoped lang="scss">
 .home {
@@ -351,7 +379,7 @@ onBeforeUnmount(() => {
   padding: 10px;
 }
 
-.btn {
+.btn1 {
   background: rgb(234, 230, 230);
   width: auto;
   height: 40px;
@@ -362,7 +390,20 @@ onBeforeUnmount(() => {
   &:hover {
     background: rgb(220, 215, 215);
   }
+  &.recording {
+    background: #231e1e;
+    color: white;
+    
+    &:hover {
+      background: #786767;
+    }
+    
+    &:active {
+      background: #bab6b6;
+    }
+  }
 }
+
 .sound-slider {
   display: flex;
   align-items: center;
@@ -391,15 +432,6 @@ onBeforeUnmount(() => {
 }
 .modal-mask {
   position: fixed;
-  // top: 0;
-  // left: 0;
-  // width: 300px;
-  // height: 150px;
-  // background: rgba(0,0,0,0.5);
-  // display: flex;
-  // justify-content: center;
-  // align-items: center;
-  // z-index: 999;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
@@ -437,18 +469,6 @@ onBeforeUnmount(() => {
       line-height: 1.5;
     }
   }
-// .modal-footer {
-//   display: flex;
-//   flex-direction: row; /* 明确指定横向排列（其实flex默认就是row） */
-//   justify-content: space-between; /* 均匀分布子元素 */
-//   width: 100%; /* 确保父容器占满可用空间 */
-//   gap: 0; /* 明确消除子元素间隙 */
-//   height:45px;
-// }
-// .modal-footer > * {
-//   box-sizing: border-box; /* 防止padding影响宽度计算 */
-  
-// }
 .modal-footer {
     padding: 12px 16px;
     background: #f5f5f5;
@@ -465,62 +485,34 @@ onBeforeUnmount(() => {
       border-radius: 4px;
       transition: all 0.3s;
       
-      &.primary {
-        background: #1890ff;
+      &.confirm {
+        background: #b8b9ba;
         color: white;
         
         &:hover {
-          background: #40a9ff;
+          background: #d5d8da;
         }
         
         &:active {
-          background: #096dd9;
+          background: #d1d4d6;
         }
       }
       
-      &.default {
-        background: white;
+      &.cancle {
+        background: rgb(151, 146, 146);
         border: 1px solid #d9d9d9;
         color: #595959;
         
         &:hover {
-          border-color: #40a9ff;
-          color: #40a9ff;
+          border-color: #aeb2b6;
+          color: #9fa7ad;
         }
         
         &:active {
-          border-color: #096dd9;
-          color: #096dd9;
+          border-color: #979ea5;
+          color: #949ca4;
         }
       }
-      
-      &.danger {
-        background: #ff4d4f;
-        color: white;
-        
-        &:hover {
-          background: #ff7875;
-        }
-        
-        &:active {
-          background: #d9363e;
-        }
-      }
-    }
-  }
-}
-
-.btn {
-  &.recording {
-    background: #ff4d4f;
-    color: white;
-    
-    &:hover {
-      background: #ff7875;
-    }
-    
-    &:active {
-      background: #d9363e;
     }
   }
 }
