@@ -43,7 +43,7 @@ const getMenuItem = (label, key, icon = null, children = null) => ({
 const items = reactive([
   getMenuItem('主页', 'sub1', () => h(HomeOutlined), [
     getMenuItem('开始', '/', () => h(PlayCircleOutlined)),
-    getMenuItem('报告', '1.3', () => h(FileTextOutlined)),
+    getMenuItem('报告', '/report', () => h(FileTextOutlined)),
   ]),
   getMenuItem('历史', 'sub2', () => h(HistoryOutlined), [  // 改用 HistoryOutlined
     getMenuItem('Option 5', '2.1', () => h(UnorderedListOutlined)),

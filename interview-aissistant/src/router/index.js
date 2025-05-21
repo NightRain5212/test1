@@ -25,6 +25,12 @@ const routes = [
     name: 'settingsView',//命名，home就可以代指url路径了
     component: () => import('../views/SettingsView.vue'),
     meta: { requiresAuth: true }
+  },
+    {
+    path: '/report',
+    name: 'reportView',//命名，home就可以代指url路径了
+    component: () => import('../views/ReportView.vue'),
+    meta: { requiresAuth: true }
   }
 ]
 
