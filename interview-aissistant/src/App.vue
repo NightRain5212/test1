@@ -1,23 +1,12 @@
 <template>
   <div class="main-content">
-    <div 
-      class="left-main-menu"
-      ref="sidebar"
-      :style="{ width: sidebarWidth + 'px' }"
-    >
+    <div class="left-main-menu" ref="sidebar" :style="{ width: sidebarWidth + 'px' }">
       <div class="drag-handle" @mousedown="startDrag"></div>
-      <a-menu
-        v-model:selectedKeys="menuState.selectedKeys"
-        mode="inline"
-        :inlineCollapsed="collapsed"
-        :open-keys="menuState.openKeys"
-        :items="items"
-        @openChange="onOpenChange"
-        @select="handleMenuSelect"
-      />
+      <a-menu v-model:selectedKeys="menuState.selectedKeys" mode="inline" :inlineCollapsed="collapsed"
+        :open-keys="menuState.openKeys" :items="items" @openChange="onOpenChange" @select="handleMenuSelect" />
     </div>
     <div class="right-main-content">
-      <router-view />
+        <router-view />
     </div>
   </div>
 </template>

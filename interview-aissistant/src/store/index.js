@@ -4,6 +4,11 @@ import { defineStore } from 'pinia';
 export const useStore = defineStore('auth', {
   state: () => ({
     isLoggedIn: false, // 表示用户是否处于登录状态
+    userInfo: {
+      username: '', // 用户名
+      email: '', // 用户邮箱
+      avatarSrc: ''// 用户头像的URL
+    },
   }),
   actions: {
     login() {
@@ -12,5 +17,8 @@ export const useStore = defineStore('auth', {
     logout() {
       this.isLoggedIn = false; // 设置为未登录
     },
+    getUser(){
+      return this.userInfo;
+    }
   },
 });

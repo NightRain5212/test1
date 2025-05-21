@@ -500,17 +500,14 @@ const handleCancel = () => {
       
       &.cancle {
         background: rgb(151, 146, 146);
-        border: 1px solid #d9d9d9;
-        color: #595959;
+        color: white;
         
         &:hover {
-          border-color: #aeb2b6;
-          color: #9fa7ad;
+          background: #d5d8da;
         }
         
         &:active {
-          border-color: #979ea5;
-          color: #949ca4;
+          background: #d1d4d6;
         }
       }
     }
