@@ -1,80 +1,78 @@
 <template>
-  <div class="main_all">
-  <div class="avatar-upload-wrapper">
-    <n-upload
-      ref="upload"
-      action="https://www.mocky.io/v2/5e4bafc63100007100d8b70f"
-      :headers="{ 'naive-info': 'hello!' }"
-      :data="{ 'naive-data': 'cool! naive!' }"
-      :show-file-list="false"
-      @change="handleUploadChange"
-    >
-      <!-- 使用 n-avatar 作为上传触发器 -->
-      <n-avatar
-        round
-        :size="48"
-        :src="avatarUrl || 'https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg'"
-        class="upload-avatar"
-      >
-        <template v-if="!avatarUrl" #default>
-          <n-icon :component="UserOutlined" />
-        </template>
-      </n-avatar>
-    </n-upload>
-  </div>
-  </div>
+    <div class="main_all">
+        <n-grid :y-gap="0" :cols="1">
+           <n-grid-item :style="{ 'background-color': '#c6b9b9' }">
+                <div class="header">
+                    <div class="header_left">
+                        <user-avatar />
+                    </div>
+                    <div class="header_right">
+                        <div class="userinfo">用户名:</div>
+                        <div class="userinfo">邮箱:</div>
+                    </div>
+                </div>
+                <div class="userinfo">个人简介:</div>
+            </n-grid-item>
+            <n-grid-item :style="{ 'background-color': 'black' }">
+                <div class="content">
+                    个人
+                </div>
+            </n-grid-item>
+        </n-grid>
+    </div>
 </template>
 
 <script setup>
-</script>
-import {ref} from 'vue'
-import { useStore } from './store';
+import { ref, onMounted, onUnmounted,nextTick,watch } from 'vue';
+import UserAvatar from '../components/UserAvatar.vue';
+import { message } from 'ant-design-vue'
+import{NGrid,NGridItem} from 'naive-ui'
+
+import { useStore } from '../store';
 const store = useStore();
-const userInfo=ref(store.getuser())
+const userInfo=ref(store.getUser())
 //const avatarUrl = userInfo.value.avatarUrl; //临时测试用
 
-import { NAvatar, NUpload, NIcon, useMessage } from 'naive-ui'
-import { UserOutlined } from '@ant-design/icons-vue'
-
-const message = useMessage()
-const upload = ref(null)
-const avatarUrl = ref('')
-
-const handleUploadChange = ({ file }) => {
-  if (file.status === 'done') {
-    // 上传成功处理
-    message.success('头像上传成功')
-    // 这里应该替换为实际返回的URL
-    avatarUrl.value = 'https://new-avatar-url.com/path/to/image.jpg'
-  } else if (file.status === 'error') {
-    message.error('头像上传失败')
-  }
-}
-
-// 如果需要点击触发文件选择（备用方案）
-const triggerUpload = () => {
-  upload.value?.openFileDialog()
-}
+</script>
 <style scoped lang="scss">
 .main_all {
   width: 100%;
   height: 100%;
-  background-color: #1a1a1a; /* 暗色背景 */
+  //background-color: #5e5b5b; /* 暗色背景 */
   padding: 20px;
   color:white;
 }
-.avatar-upload-wrapper {
-  display: inline-block;
-  position: relative;
-}
+.header {
+    display: flex;
+    height: 100px;
+    flex-direction: row;
 
-.upload-avatar {
-  cursor: pointer;
-  transition: transform 0.3s ease;
-  
-  &:hover {
-    transform: scale(1.1);
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
-  }
+    .header_left {
+        width: 100px;
+        height: 100%;
+        /* 宽度为50% */
+        padding: 10px;
+        /* 内边距 */
+        box-sizing: border-box;
+        /* 包含内边距和边框 */
+        text-align: center;
+    }
+
+    .header_right {
+        flex: 1;
+        height:100%;
+        padding: 10px;
+        /* 内边距 */
+        box-sizing: border-box;
+        /* 包含内边距和边框 */
+    }
+}
+.content{
+    height:200px;
+    background-color: #534f4f;
+}
+.userinfo{ 
+    font-size: auto;
+    color: white;
 }
 </style>

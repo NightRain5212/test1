@@ -1,31 +1,34 @@
 <template>
-    <div class="main_all">
+  <div class="main_all">
+    <n-split direction="horizontal" style="height: 100%" :max="0.55" :min="0.45">
+      <template #1>
         <div class="picture-analysis">
-            <!-- 视频播放器 -->
-            <video ref="videoEl" :src="videoSrc" controls crossorigin="anonymous"
-                @loadedmetadata="initAnalysis"></video>
+          <!-- 视频播放器 -->
+          <video ref="videoEl" :src="videoSrc" controls crossorigin="anonymous" @loadedmetadata="initAnalysis"></video>
 
-            <!-- 分析控制 -->
-            <div class="controls">
-                <n-button @click="startAnalysis" :disabled="isAnalyzing">
-                    {{ isAnalyzing ? '分析中...' : '开始分析' }}
-                </n-button>
-            </div>
+          <!-- 分析控制 -->
+          <div class="controls">
+            <n-button @click="startAnalysis" :disabled="isAnalyzing">
+              {{ isAnalyzing ? '分析中...' : '开始分析' }}
+            </n-button>
+          </div>
 
-            <!-- 图表容器 -->
-            <div ref="chartEl" class="chart-container"></div>
+          <!-- 图表容器 -->
+          <div ref="chartEl" class="chart-container"></div>
         </div>
-        <div class="sidebar">侧边栏</div>
+      </template>
+      <template #2>
         <div class="video-analysis">音频分析</div>
-    </div>
+      </template>
+    </n-split>
+  </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import * as echarts from 'echarts'
-import { NButton } from 'naive-ui'
-const videoSrc = ref('https://www.bing.com/ck/a?!&&p=98665e753b822973c5da9c56390078296a7c71d8d7df1760f69f3f842ca84cafJmltdHM9MTc0Nzc4NTYwMA&ptn=3&ver=2&hsh=4&fclid=19c60bae-e46d-6695-14a5-1f69e56c67a7&u=a1L3ZpZGVvcy9yaXZlcnZpZXcvcmVsYXRlZHZpZGVvP3E9JWU2JTk2JTk3JWU5JWJlJTk5JWU2JTg4JTk4JWU1JWEzJWFiJm1pZD1COEI2OUUyQzREREMzRUUzN0E3M0I4QjY5RTJDNEREQzNFRTM3QTczJkZPUk09VklSRQ&ntb=1')
-//const videoSrc = 'https://www.bing.com/videos/riverview/relatedvideo?&q=%e7%89%b9%e6%9c%97%e6%99%ae&&mid=1F950473A1D6FD3519281F950473A1D6FD351928&&FORM=VRDGAR' // 替换为你的视频URL
+import { NButton,NSplit } from 'naive-ui'
+const videoSrc = ref('/demo-video.mp4')//直接可以访问public下的文件
 const videoEl = ref(null)
 const chartEl = ref(null)
 const isAnalyzing = ref(false)
@@ -144,17 +147,13 @@ const updateChart = (data) => {
 .main_all {
   width: 100%;
   height: 100%;
+  padding:10px;
   background-color: #938a8a; /* 暗色背景 */ 
     display: flex;
   flex-direction: row;
 }
 .picture-analysis { 
     flex:8;
-}
-.sidebar {
-    flex: 0.2;
-    background-color: #faf4f4; /* 侧边栏背景 */
-    padding: 20px; 
 }
 .video-analysis {
     background-color: #d99b9b; /* 侧边栏背景 */
