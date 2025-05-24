@@ -179,7 +179,7 @@ function startRecording() {
       }
     }
 
-    mediaRecorder.value.start(200) // 每200ms记录一次数据
+    mediaRecorder.value.start(1000) // 每1s记录一次数据
     isRecording.value = true
     recordingStartTime.value = Date.now()
     updateRecordingDuration()
