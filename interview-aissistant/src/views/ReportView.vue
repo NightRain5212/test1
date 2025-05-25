@@ -12,7 +12,19 @@
               {{ isAnalyzing ? '分析中...' : '开始分析' }}
             </n-button>
           </div>
-
+                     <!-- 可拖动遮盖层 -->
+          <div 
+            class="drag-layer"
+            :style="{ height: `${dragHeight}px` }"
+            @mousedown="startDrag"
+          >
+            <div class="drag-handle"></div>
+            <div class="drag-content">
+              <!-- 这里放置遮盖层内容 -->
+              分析结果详情
+              <div ref="chartEl" class="chart-container"></div>
+            </div>
+          </div>
           <!-- 图表容器 -->
           <div ref="chartEl" class="chart-container"></div>
         </div>
@@ -22,12 +34,14 @@
       </template>
     </n-split>
   </div>
+  <graph/>
 </template>
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import * as echarts from 'echarts'
 import { NButton,NSplit } from 'naive-ui'
+import Graph from '../components/Graph.vue'
 const videoSrc = ref('/demo-video.mp4')//直接可以访问public下的文件
 const videoEl = ref(null)
 const chartEl = ref(null)
@@ -141,6 +155,36 @@ const updateChart = (data) => {
     }]
   })
 }
+
+const dragHeight = ref(200); // 初始高度
+    const isDragging = ref(false);
+    const startY = ref(0);
+    const startHeight = ref(0);
+
+    const startDrag = (e) => {
+      isDragging.value = true;
+      startY.value = e.clientY;
+      startHeight.value = dragHeight.value;
+      document.addEventListener('mousemove', handleDrag);
+      document.addEventListener('mouseup', stopDrag);
+    };
+
+    const handleDrag = (e) => {
+      if (!isDragging.value) return;
+      const deltaY = startY.value - e.clientY;
+      const newHeight = startHeight.value + deltaY;
+      
+      // 限制高度范围（最小50px，最大占屏幕70%）
+      const maxHeight = window.innerHeight * 0.7;
+      dragHeight.value = Math.max(50, Math.min(newHeight, maxHeight));
+    };
+
+    const stopDrag = () => {
+      isDragging.value = false;
+      document.removeEventListener('mousemove', handleDrag);
+      document.removeEventListener('mouseup', stopDrag);
+    };
+
 </script>
 
 <style scoped lang="scss">
@@ -181,5 +225,46 @@ video {
   height: 400px;
   border: 1px solid #eee;
   border-radius: 4px;
+}
+
+
+/* 可拖动层样式 */
+.picture-analysis {
+  position: relative;
+  height: 100%;
+  overflow: hidden; /* 防止内容溢出 */
+}
+
+.drag-layer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.9);
+  border-top: 1px solid #ddd;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  transition: height 0.2s ease;
+  z-index: 10;
+}
+
+.drag-handle {
+  height: 16px;
+  background: #f0f0f0;
+  cursor: ns-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drag-handle::after {
+  content: "≡";
+  color: #666;
+  font-size: 20px;
+}
+
+.drag-content {
+  padding: 10px;
+  height: calc(100% - 16px); /* 减去把手高度 */
+  overflow-y: auto;
 }
 </style>
