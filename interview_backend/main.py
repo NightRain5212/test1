@@ -1,5 +1,7 @@
 from dotenv import load_dotenv
 import os  # 用于获取环境变量
+import subprocess
+import sys
 
 from fastapi import FastAPI, HTTPException, Request, status
 from pydantic import BaseModel
@@ -9,9 +11,10 @@ from datetime import datetime, timedelta #timedelta类可以参与datatime的加
 from typing import Optional
 
 from passlib.context import CryptContext #用于密码哈希和验证
-import secrets #用于生成安全的随机令牌
-#jwt相关
-from jose import jwt
+import secrets  #用于生成安全的随机令牌
+from jose import jwt #jwt相关
+
+from analyzer import main as analyzer #导入模块
 
 # 创建实例化对象
 print(">>>>>>>>>>>>>>>>>>>>>加载对象实例<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
@@ -25,6 +28,8 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
 REFRESH_TOKEN_EXPIRE_MINUTES =int(os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES")) 
+
+analyzer.run()#测试
 
 # 定义 Pydantic 模型
 class RefreshTokenRequest(BaseModel):
@@ -260,9 +265,6 @@ async def get_info(username: str):
 
 # 如果通过命令fastapi dev main.py，则不会执行下面的代码
 if __name__ == "__main__":
-    import subprocess
-    import sys
-    
     # 使用 FastAPI CLI 启动应用
     subprocess.run([
         sys.executable,  # 当前 Python 解释器路径
