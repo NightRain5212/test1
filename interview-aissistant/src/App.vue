@@ -3,7 +3,7 @@
     <div class="left-main-menu" ref="sidebar" :style="{ width: sidebarWidth + 'px' }">
       <div class="drag-handle" @mousedown="startDrag"></div>
       <a-menu v-model:selectedKeys="menuState.selectedKeys" mode="inline" :inlineCollapsed="collapsed"
-        :open-keys="menuState.openKeys" :items="items" @openChange="onOpenChange" @select="handleMenuSelect" />
+        :open-keys="menuState.openKeys" :items="items" @openChange="onOpenChange" @select="handleMenuSelect" theme="dark"/>
     </div>
     <div class="right-main-content">
         <router-view />
@@ -59,7 +59,7 @@ const items = reactive([
 
 // 菜单状态管理
 const menuState = reactive({
-  openKeys: ['sub1'],
+  openKeys: [],
   selectedKeys: []
 });
 
@@ -82,14 +82,14 @@ const handleMenuSelect = ({ key }) => {
 };
 
 // 侧边栏拖动逻辑
-const sidebarWidth = ref(200); // 初始宽度
+const sidebarWidth = ref(70); // 初始宽度
 const minWidth = 70; // 最小宽度(只显示图标)
 const maxWidth = 200; // 最大宽度
 const isDragging = ref(false);
 const startX = ref(0);
 const startWidth = ref(0);
 const sidebar = ref(null);
-const collapsed = ref(false);
+const collapsed = ref(true);
 
 const startDrag = (e) => {
   isDragging.value = true;
@@ -111,7 +111,7 @@ const handleDrag = (e) => {
   
   sidebarWidth.value = newWidth;
 //宽度过小时，自动折叠
-  if (sidebarWidth.value < minWidth) collapsed.value = true;
+  if (sidebarWidth.value <= minWidth) collapsed.value = true;
   else collapsed.value = false;
 };
 
@@ -142,12 +142,12 @@ onUnmounted(() => {
   box-sizing: border-box;
   font-family: "Poppins", sans-serif;
   display: flex; /* 只需要写一次 */
+  background-color: rgb(54, 50, 50);
 }
 .left-main-menu {
   position: relative;
   height: 100%;
   border-right: 1px solid #f0f0f0;
-  background: #fff;
   transition: width 0.2s;
   flex-shrink: 0;//防止收缩
   overflow: hidden;//溢出隐藏

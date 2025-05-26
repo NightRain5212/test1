@@ -1,6 +1,6 @@
 <template>
   <!-- 用于显示模态框的时候判断鼠标点击是否有效 -->
-  <div class="home"  :style="{ 'pointer-events': isModalOpen ? 'none' : 'auto' }">
+  <div class="home" :style="{ 'pointer-events': isModalOpen ? 'none' : 'auto' }">
     <div class="viewarea">
       <!-- 摄像头视频显示区域 -->
       <video ref="cameraVideo" autoplay muted class="camera" v-show="isCameraActive"></video>
@@ -21,21 +21,22 @@
         保存
       </button>
       <div class="sound-slider">
-        <div class="icon">
+        <i class="sound-icon">
+          <!-- 音量开启图标（当 sliderValue > 0 时显示） -->
           <svg v-if="sliderValue > 0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-            stroke-width="1.5" stroke="currentColor" class="size-6">
+            stroke-width="1.5" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round"
               d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
           </svg>
+          <!-- 静音图标（当 sliderValue = 0 时显示） -->
           <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-            stroke="currentColor" class="size-6">
+            stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round"
               d="M17.25 9.75 19.5 12m0 0 2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6 4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
           </svg>
-        </div>
-        <div class="slider">
-          <a-slider v-model:value="sliderValue" :min="0" :max="100" />
-        </div>
+        </i>
+        <!-- Ant Design 滑块 -->
+        <a-slider v-model:value="sliderValue" :min="0" :max="100" class="slider" />
       </div>
     </div>
   </div>
@@ -406,18 +407,25 @@ const handleCancel = () => {
 
 .sound-slider {
   display: flex;
+  /* 启用 Flex 布局 */
   align-items: center;
   /* 垂直居中 */
-  gap: 10px;
-  /* 图标和滑块间距 */
+  gap: 12px;
+  /* 图标和滑块之间的间距 */
   padding: 8px 12px;
+  /* 内边距 */
+  border-radius: 4px;
 
-  .icon {
+  /* 圆角（可选） */
+  .sound-icon {
     flex-shrink: 0;
     /* 防止图标被压缩 */
     width: 24px;
+    /* 图标宽度 */
     height: 24px;
-    color: #e2e7ebe9;
+    /* 图标高度 */
+    color: #8b9095;
+    /* 图标颜色 */
   }
 
   .slider {
@@ -425,11 +433,23 @@ const handleCancel = () => {
     /* 滑块占据剩余空间 */
   }
 
-  /* 调整antd滑块样式（可选） */
+  /* 调整 Ant Design 滑块样式 */
   .ant-slider {
     margin: 0;
+    /* 去除默认外边距 */
+  }
+
+  .ant-slider-track {
+    background-color: #848b93;
+    /* 滑块轨道颜色 */
+  }
+
+  .ant-slider-handle {
+    border-color: #5e6266;
+    /* 滑块手柄颜色 */
   }
 }
+
 .modal-mask {
   position: fixed;
   top: 50%;

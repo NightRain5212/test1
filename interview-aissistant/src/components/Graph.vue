@@ -1,17 +1,17 @@
 <template>
   <div class="chart-container" ref="chartContainer">
     <!-- 右上角控制按钮 -->
-    <div class="control-panel">
+    <span class="control-panel">
       <button @click="resetView">
-        <i class="icon-reset"></i> 重置视图
+        <i class="btn-reset"></i> 重置视图
       </button>
-      <button @click="toggle2D3D">
-        <i class="icon-2d3d"></i> {{ is2D ? '3D模式' : '2D模式' }}
+      <button @click="toggle2D">
+        <i class="btn-2d"></i> {{ is2D ? '3D模式' : '2D模式' }}
       </button>
-    </div>
+    </span>
     
     <!-- ECharts容器 -->
-    <div ref="chartEl" class="chart-3d"></div>
+    <div ref="chartE" class="chart-3d"></div>
   </div>
 </template>
 
@@ -20,7 +20,7 @@ import * as echarts from 'echarts';
 import 'echarts-gl';
 import { ref, onMounted, onBeforeUnmount } from 'vue';
 
-const chartEl = ref(null);
+const chartE = ref(null);
 const chartContainer = ref(null);
 let chartInstance = null;
 const is2D = ref(false);
@@ -41,13 +41,13 @@ const mockData = () => {
 
 // 初始化图表
 const initChart = () => {
-  chartInstance = echarts.init(chartEl.value, 'dark');
+  chartInstance = echarts.init(chartE.value, 'dark');
   
   const option = {
     backgroundColor: '#1a1a1a',
     tooltip: {},
     visualMap: {
-      show: false,
+      show: true,
       dimension: 3,
       min: 0,
       max: 10,
@@ -57,22 +57,22 @@ const initChart = () => {
     },
     xAxis3D: {
       type: 'value',
-      name: 'X轴',
+      name: 'X',
       axisLine: { lineStyle: { color: '#aaa' } }
     },
     yAxis3D: {
       type: 'value',
-      name: 'Y轴',
+      name: 'Y',
       axisLine: { lineStyle: { color: '#aaa' } }
     },
     zAxis3D: {
       type: 'value',
-      name: 'Z轴',
+      name: 'Z',
       axisLine: { lineStyle: { color: '#aaa' } }
     },
     grid3D: {
       viewControl: {
-        autoRotate: false,
+        autoRotate: true,
         rotateSensitivity: 1,  // 旋转灵敏度
         zoomSensitivity: 0.8,  // 缩放灵敏度
         distance: 150,         // 初始距离
@@ -121,6 +121,7 @@ const initChart = () => {
 
 // 重置视图
 const resetView = () => {
+  //多次使用setOption只会合并
   chartInstance.setOption({
     grid3D: {
       viewControl: {
@@ -133,7 +134,7 @@ const resetView = () => {
 };
 
 // 切换2D/3D
-const toggle2D3D = () => {
+const toggle2D = () => {
   is2D.value = !is2D.value;
   chartInstance.setOption({
     grid3D: {
@@ -177,13 +178,17 @@ onBeforeUnmount(() => {
     right: 20px;
     z-index: 10;
     display: flex;
+    flex-direction: column;
     gap: 10px;
-
+    border-color:rgb(232, 228, 228);
+    border-style: solid;
+    border-radius: 4px;
+    border-width:0.5px;
     button {
       padding: 6px 12px;
       background: rgba(0, 0, 0, 0.7);
       color: #fff;
-      border: 1px solid #444;
+      border: 1px solid #8a8181;
       border-radius: 4px;
       cursor: pointer;
       transition: all 0.3s;
