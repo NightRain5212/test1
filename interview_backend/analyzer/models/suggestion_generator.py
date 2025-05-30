@@ -1,37 +1,50 @@
-from transformers import AutoTokenizer, AutoModelForCausalLM
-import torch
+import requests
 from datetime import datetime
+from dotenv import load_dotenv
+API_TOKEN = "your_huggingface_api_token_here"
 
 class SuggestionGenerator:
-    def __init__(self, model_name="internlm/internlm2-chat-7b"):
+    def __init__(self, model_name="internlm/internlm2-chat-7b", api_token=API_TOKEN):
         """
         初始化建议生成器
         model_name: 使用的大模型名称
+        api_token: HuggingFace API token
         """
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            device_map="auto",
-            torch_dtype=torch.float16,
-            trust_remote_code=True
-        )
-        
+        self.model_name = model_name
+        self.api_token = api_token
+        self.api_url = f"https://api-inference.huggingface.co/models/{model_name}"
+        self.headers = {"Authorization": f"Bearer {api_token}"} if api_token else {}
+
     def generate_suggestions(self, analysis_result):
         """根据分析结果生成建议"""
         prompt = self._build_prompt(analysis_result)
         
-        # 生成回答
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
-        outputs = self.model.generate(
-            inputs.input_ids,
-            max_new_tokens=1024,
-            temperature=0.7,
-            top_p=0.9,
-            repetition_penalty=1.1
-        )
-        response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        
-        return self._parse_response(response)
+        # 通过API生成回答
+        try:
+            response = requests.post(
+                self.api_url,
+                headers=self.headers,
+                json={"inputs": prompt, "parameters": {
+                    "max_new_tokens": 1024,
+                    "temperature": 0.7,
+                    "top_p": 0.9,
+                    "repetition_penalty": 1.1
+                }}
+            )
+            response.raise_for_status()
+            result = response.json()
+            
+            # API返回格式可能因模型而异，这里假设返回的是列表中的第一个结果
+            generated_text = result[0]["generated_text"] if isinstance(result, list) else result["generated_text"]
+            
+            return self._parse_response(generated_text)
+            
+        except Exception as e:
+            return {
+                "raw_response": f"生成建议时发生错误: {str(e)}",
+                "timestamp": datetime.now().isoformat(),
+                "error": True
+            }
         
     def _build_prompt(self, data):
         """构建提示词"""
@@ -81,4 +94,24 @@ class SuggestionGenerator:
         return {
             "raw_response": response,
             "timestamp": datetime.now().isoformat()
+        }
+
+    def generate_suggestions(self, score_result):
+        """根据得分生成建议"""
+        # 这里是示例实现，实际应该包含更复杂的建议生成逻辑
+        scores = score_result["scores"]
+        suggestions = []
+        
+        if scores["video"] < 0.6:
+            suggestions.append("建议改善面部表情和姿态，保持自然和专业。")
+        if scores["voice"] < 0.6:
+            suggestions.append("建议调整语速和语调，使表达更加清晰有力。")
+        if scores["text"] < 0.6:
+            suggestions.append("建议提高回答的相关性和完整性，更好地结合自身经验。")
+            
+        if not suggestions:
+            suggestions.append("整体表现不错，继续保持！")
+            
+        return {
+            "raw_response": "\n".join(suggestions)
         } 

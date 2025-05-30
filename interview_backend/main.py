@@ -2,8 +2,17 @@ from dotenv import load_dotenv
 import os  # 用于获取环境变量
 import subprocess
 import sys
+import shutil
+from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request, status
+# 添加项目根目录到Python路径
+current_dir = Path(__file__).parent
+sys.path.append(str(current_dir))
+
+from fastapi import FastAPI, HTTPException, Request, status, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from database import DatabaseManager
 
@@ -14,11 +23,30 @@ from passlib.context import CryptContext #用于密码哈希和验证
 import secrets  #用于生成安全的随机令牌
 from jose import jwt #jwt相关
 
-from analyzer import main as analyzer #导入模块
+# 导入分析器
+from analyzer.main import InterviewAnalyzer
+from config import UPLOAD_DIR, TEMP_DIR, VIDEO_DIR, AUDIO_DIR, UPLOAD_CONFIG
+
+# 创建分析器实例
+from analyzer.main import InterviewAnalyzer
+from config import UPLOAD_DIR, TEMP_DIR, VIDEO_DIR, AUDIO_DIR, UPLOAD_CONFIG
+
+# 创建分析器实例
+analyzer = InterviewAnalyzer()
 
 # 创建实例化对象
 print(">>>>>>>>>>>>>>>>>>>>>加载对象实例<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 app = FastAPI()
+
+# 添加CORS中间件
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 在生产环境中应该设置具体的域名
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 db_manager = DatabaseManager()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")  # 用于密码哈希和验证
 # 配置JWT
@@ -27,9 +55,9 @@ print(">>>>>>>>>>>>>>>>>>>>>加载环境变量<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
-REFRESH_TOKEN_EXPIRE_MINUTES =int(os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES")) 
+REFRESH_TOKEN_EXPIRE_MINUTES =int(os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES"))
 
-analyzer.run()#测试
+# analyzer.run()#测试
 
 # 定义 Pydantic 模型
 class RefreshTokenRequest(BaseModel):
@@ -42,6 +70,11 @@ class RegisterRequest(BaseModel):
 
 class UserInfoRequest(BaseModel):
     username: str
+
+# 定义视频分析请求模型
+class VideoAnalysisRequest(BaseModel):
+    video_path: str
+    resume_text: str = ""  # 可选的简历文本
 
 # 传入刷新令牌，获取新的访问令牌access_token和刷新令牌refresh_token
 @app.post("/api/auth/refresh")
@@ -262,6 +295,169 @@ async def get_info(username: str):
     res={"data": user_info}
     print("返回用户信息:", res)
     return res
+
+# 文件上传处理
+@app.post("/api/upload")
+async def upload_file(file: UploadFile = File(...)):
+    try:
+        print(f"开始处理文件上传: {file.filename}")
+        
+        # 检查文件扩展名
+        file_extension = Path(file.filename).suffix.lower()
+        print(f"文件扩展名: {file_extension}")
+        
+        if file_extension not in UPLOAD_CONFIG["allowed_extensions"]:
+            print(f"不支持的文件类型: {file_extension}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"不支持的文件类型。支持的类型: {', '.join(UPLOAD_CONFIG['allowed_extensions'])}"
+            )
+        
+        # 读取文件内容
+        content = await file.read()
+        file_size = len(content)
+        
+        # 检查文件大小
+        if file_size > UPLOAD_CONFIG["max_file_size"]:
+            print(f"文件太大: {file_size} bytes")
+            raise HTTPException(
+                status_code=400,
+                detail=f"文件大小超过限制: {UPLOAD_CONFIG['max_file_size'] / 1024 / 1024}MB"
+            )
+        
+        # 生成唯一文件名
+        unique_filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{secrets.token_hex(4)}{file_extension}"
+        print(f"生成的文件名: {unique_filename}")
+        
+        # 根据文件类型选择存储目录
+        if file_extension in [".mp4", ".avi", ".mov", ".webm"]:
+            save_dir = VIDEO_DIR
+        elif file_extension in [".wav", ".mp3"]:
+            save_dir = AUDIO_DIR
+        else:
+            save_dir = UPLOAD_DIR
+            
+        print(f"保存目录: {save_dir}")
+        
+        # 确保目录存在
+        save_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 保存文件
+        file_path = save_dir / unique_filename
+        print(f"完整文件路径: {file_path}")
+        
+        with open(file_path, "wb") as buffer:
+            buffer.write(content)
+        
+        print(f"文件上传成功: {file_path}")
+        
+        return {
+            "data": {
+                "filename": unique_filename,
+                "filepath": str(file_path)
+            }
+        }
+        
+    except HTTPException as e:
+        print(f"HTTP异常: {str(e)}")
+        raise e
+    except Exception as e:
+        print(f"上传过程中出现错误: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"文件上传失败: {str(e)}"
+        )
+    finally:
+        await file.close()
+
+# 挂载静态文件目录
+app.mount("/videos", StaticFiles(directory=str(VIDEO_DIR), check_dir=False), name="videos")
+app.mount("/audio", StaticFiles(directory=str(AUDIO_DIR), check_dir=False), name="audio")
+
+# 获取视频文件
+@app.get("/api/video/{filename}")
+async def get_video(filename: str):
+    try:
+        # 清理文件名，只保留基本文件名
+        clean_filename = Path(filename).name
+        video_path = VIDEO_DIR / clean_filename
+        
+        print(f"请求视频文件: {clean_filename}")
+        print(f"完整路径: {video_path}")
+        
+        if not video_path.exists():
+            print(f"文件不存在: {video_path}")
+            raise HTTPException(status_code=404, detail="视频文件不存在")
+            
+        return FileResponse(str(video_path))
+    except Exception as e:
+        print(f"获取视频失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取视频失败: {str(e)}")
+
+# 分析视频
+@app.post("/api/analyze/video")
+async def analyze_video(request: VideoAnalysisRequest):
+    """
+    分析面试视频接口
+    """
+    try:
+        print(f"收到分析请求，视频路径: {request.video_path}")
+        
+        # 清理和验证文件名
+        filename = Path(request.video_path).name
+        if not filename:
+            raise HTTPException(
+                status_code=400,
+                detail="无效的文件名"
+            )
+            
+        # 构建完整的文件路径
+        video_path = VIDEO_DIR / filename
+        print(f"完整文件路径: {video_path}")
+        print(f"文件是否存在: {video_path.exists()}")
+        print(f"当前工作目录: {os.getcwd()}")
+        print(f"视频目录内容: {list(VIDEO_DIR.glob('*'))}")
+        
+        if not video_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"视频文件不存在: {filename}"
+            )
+            
+        # 如果提供了简历文本，更新分析器的简历文本
+        if request.resume_text:
+            analyzer.resume_text = request.resume_text
+            
+        print(f"开始分析视频: {video_path}")
+        
+        # 执行分析
+        try:
+            result = analyzer.analyze_interview(str(video_path))
+            print("分析完成，返回结果")
+            return {
+                "data": result,
+                "message": "分析完成"
+            }
+        except Exception as e:
+            print(f"分析过程出错: {str(e)}")
+            print(f"错误类型: {type(e)}")
+            import traceback
+            print(f"错误堆栈: {traceback.format_exc()}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"视频分析失败: {str(e)}"
+            )
+            
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        print(f"处理请求时出错: {str(e)}")
+        import traceback
+        print(f"错误堆栈: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"处理请求失败: {str(e)}"
+        )
 
 # 如果通过命令fastapi dev main.py，则不会执行下面的代码
 if __name__ == "__main__":
