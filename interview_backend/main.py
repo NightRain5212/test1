@@ -8,13 +8,14 @@ from pydantic import BaseModel
 from database import DatabaseManager
 
 from datetime import datetime, timedelta #timedelta类可以参与datatime的加减
-from typing import Optional
+from typing import Optional,Dict,Any
 
 from passlib.context import CryptContext #用于密码哈希和验证
 import secrets  #用于生成安全的随机令牌
 from jose import jwt #jwt相关
 
-from analyzer import main as analyzer #导入模块
+
+#from analyzer import main as analyzer #导入模块
 
 # 创建实例化对象
 print(">>>>>>>>>>>>>>>>>>>>>加载对象实例<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
@@ -29,7 +30,7 @@ ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
 REFRESH_TOKEN_EXPIRE_MINUTES =int(os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES")) 
 
-analyzer.run()#测试
+#analyzer.run()#测试
 
 # 定义 Pydantic 模型
 class RefreshTokenRequest(BaseModel):
@@ -41,8 +42,10 @@ class RegisterRequest(BaseModel):
     password: str
 
 class UserInfoRequest(BaseModel):
+    id: int
     username: str
-
+    email: str =None
+    preference: Dict[str, Any] = {}  # 明确字典类型
 # 传入刷新令牌，获取新的访问令牌access_token和刷新令牌refresh_token
 @app.post("/api/auth/refresh")
 async def refresh_token(request: RefreshTokenRequest,meta:Request):
@@ -228,6 +231,7 @@ async def login(request: RegisterRequest,meta: Request):#request使用pydantic�
     # 4. 返回响应
     res={
         "data": {
+            "id": user["id"],
             "access_token": access_token,
             "refresh_token": refresh_token,
             "token_type": "bearer",
@@ -253,6 +257,7 @@ async def get_info(username: str):
     print("用户存在")
     print(user)
     user_info = {
+        "id": user[0]["id"],
         "username": user[0]["username"],
         "email": user[0]["email"],
         "password": user[0]["password"],  # 注意：实际不应返回密码字段
@@ -263,6 +268,27 @@ async def get_info(username: str):
     print("返回用户信息:", res)
     return res
 
+@app.post("/api/user/update_info")
+async def update_info(request: UserInfoRequest):
+    print(">>>>>>>>>>开始更新用户信息<<<<<<<<<<<<<<<<<")
+    # 查询用户信息
+    user = db_manager.select(
+        table="users",
+        conditions={"id": request.id}
+    )
+    if not user:
+        print("用户不存在")
+        return {"data": None,"code":0}  # 如果没有找到用户，返回空字典，不返回error
+
+    print("用户存在")
+    try:
+        db_manager.update(table="users",data={'username':request.username,'email':request.email},conditions={"user_id":user[0]["id"]})
+        db_manager.update(table="user_store",data=request.preference,conditions={"user_id":user[0]["id"]})
+        return {"data": "更新成功","code":1}
+    except Exception as e:
+        print("更新失败:", e)
+        return {"data": None,"code":0}
+    
 # 如果通过命令fastapi dev main.py，则不会执行下面的代码
 if __name__ == "__main__":
     # 使用 FastAPI CLI 启动应用

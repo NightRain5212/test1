@@ -105,7 +105,7 @@ import { useRouter } from 'vue-router'
 const route = useRouter() // 获取全局路由实例，一个app只有一个route实例
 import{Modal,message} from "ant-design-vue";
 import { debounce } from 'lodash-es';// 防抖函数
-
+import rules from "../utils/rules";
 import {  useStore } from '../store'
 const store = useStore() // 获取全局状态管理实例，一个app只有一个store实例
 const logininput_info = ref({
@@ -155,15 +155,6 @@ function closeLoginForm (){
     }, 300);
 
 }
-// 正则表达式定义
-/**
- * - username 4~30 位,字母、汉字、数字、连字符（-），不能以数字开头，不能包含空格
- *  password 8~12 位 字母、数字、特殊字符（!@#$%^&*()_+）,至少包含字母和数字，不能包含空格和汉字
--* email 最长50个字符，也可以没有
- */
- const usernameRegex = /^[a-zA-Z\u4e00-\u9fa5][a-zA-Z0-9\u4e00-\u9fa5-]{3,29}$/;
-const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[!-~]{8,12}$/;
-const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/
 
 async function performLogin(input_info) {
     const hideLoading = message.loading('登录中...', 0);
@@ -188,7 +179,7 @@ async function performLogin(input_info) {
             return false;
         }
         // 3. 登录流程
-        return await handleLoginSuccess(input_info);
+        return await handleLoginSuccess(input_info,res.data);
     } catch (error) {
         handleLoginError(error);
         return false;
@@ -220,7 +211,7 @@ async function handleUserNotExist(input_info) {
 }
 
 // 登录成功处理
-async function handleLoginSuccess(input_info) {
+async function handleLoginSuccess(input_info,res) {
     try {
         const tokenRes = await axios.post('/auth/login', input_info);
         console.log('请求令牌，返回：', tokenRes)
@@ -231,7 +222,8 @@ async function handleLoginSuccess(input_info) {
         // 存储令牌
         localStorage.setItem('accessToken', tokenRes.data.access_token);
         localStorage.setItem('refreshToken', tokenRes.data.refresh_token);
-
+        localStorage.setItem('id', res.id);
+        store.save(res)
         startTokenRefresh(tokenRes.data.expired_in);
         message.success(`欢迎回来，${input_info.username}!`);
         display_loginform.value = false; // 关闭登录界面
@@ -274,12 +266,12 @@ async function login() {
             return false;
         }
 
-        if (!usernameRegex.test(input_info.username)) {
+        if (!rules.usernameRegex.test(input_info.username)) {
             message.error('用户名必须为4-30位字母/汉字/数字/连字符组合，且不能以数字开头');
             return false;
         }
 
-        if (!passwordRegex.test(input_info.password)) {
+        if (!rules.passwordRegex.test(input_info.password)) {
             message.error('密码必须为8-12位，包含字母和数字，可加特殊字符(!@#$%^&*等)');
             return false;
         }
@@ -375,12 +367,12 @@ async function handleRegister(e) {
     const input_info={...registerinput_info.value}
     // 输入验证
     function register_validateInput() {
-        if (!usernameRegex.test(input_info.username)) {
+        if (!rules.usernameRegex.test(input_info.username)) {
             message.error('用户名必须为4-30位字母/汉字/数字/连字符组合，且不能以数字开头');
             return false;
         }
 
-        if (!passwordRegex.test(input_info.password)) {
+        if (!rules.passwordRegex.test(input_info.password)) {
             message.error('密码必须为8-12位，包含字母和数字，可加特殊字符(!@#$%^&*等)');
             return false;
         }
@@ -394,7 +386,7 @@ async function handleRegister(e) {
             message.error('请填写所有必填项')
             return false;
         }
-        if (!emailRegex.test(input_info.email)) {
+        if (!rules.passwordRegex.test(input_info.email)) {
             message.error('邮箱格式不正确')
             return false;
         }

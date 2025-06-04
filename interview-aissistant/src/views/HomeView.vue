@@ -39,9 +39,7 @@
         <a-slider v-model:value="sliderValue" :min="0" :max="100" class="slider" />
       </div>
     </div>
-  </div>
-  <!-- vue提供组件---将模态框渲染到 body 末尾 -->
-  <Teleport to="body">
+      <Teleport to="#modal-root">
     <!-- 内容区域启用指针事件 -->
     <div v-if="isModalOpen" class="modal-mask" style="pointer-events: auto;" @click.stop>
       <div class="modal-header">
@@ -56,10 +54,13 @@
       </div>
     </div>
   </Teleport>
+  </div>
+ 
 </template>
 <script setup>
 import { message } from 'ant-design-vue'
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+// import{addModal,Notice} from '../components/Notice/index.js';
 //摄像相关
 const isCameraActive = ref(false)
 const cameraVideo = ref(null)
@@ -296,44 +297,6 @@ const handleCancel = () => {
   currentModal.value?.onCancel?.();
   showNextModal();
 };
-
-// // 处理模态框关闭
-// function Close(forceClose = false) {
-//   if (forceClose) {
-//     stopCamera();
-//     showText1.value = false;
-//   } else {
-//     showText1.value = false;
-//   }
-// }
-
-// // 处理保存并关闭
-// async function saveAndClose() {
-//   try {
-//     await saveRecording();
-//     stopCamera();
-//     showText1.value = false;
-//     message.success('录像已保存');
-//   } catch (error) {
-//     message.error('保存失败');
-//     console.error('保存失败:', error);
-//   }
-//   stopCamera();
-// }
-
-// // 更新关闭摄像头逻辑
-// async function toggleCamera() {
-//   if (isCameraActive.value) {
-//     // 如果有未保存的录像，显示确认框
-//    if (hasUnsavedRecording) {
-//       showText1.value = true;
-//     } else {
-//       stopCamera();
-//     }
-//   } else {
-//     await startCamera();
-//   }
-// }
 </script>
 
 <style scoped lang="scss">
@@ -449,7 +412,6 @@ const handleCancel = () => {
     /* 滑块手柄颜色 */
   }
 }
-
 .modal-mask {
   position: fixed;
   top: 50%;
@@ -533,7 +495,6 @@ const handleCancel = () => {
     }
   }
 }
-
 .recording-duration {
   color: #fff;
   text-align: center;

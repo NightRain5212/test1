@@ -1,1 +1,4 @@
 interview_analyzer/
+*.bat
+*.vbs
+run.txt

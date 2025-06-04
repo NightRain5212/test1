@@ -9,7 +9,7 @@
     <input ref="fileInput" type="file" accept="image/*" style="display: none" @change="handleFileSelect" />
     <!-- 裁剪模态框 -->
     <n-modal v-model:show="showCropModal">
-        <n-card style="width: 500px">
+        <n-card style="width: 300px">
             <template #header>裁剪头像</template>
             <div class="cropper-container">
                 <img ref="cropperImage" src="" alt="未选择图片！" />
@@ -141,7 +141,7 @@ watch(showCropModal, (val) => {
 //裁剪框样式
 .cropper-container {
   width: 100%;
-  height: 400px;
+  height: 200px;
   overflow: hidden;
 }
 

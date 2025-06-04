@@ -7,7 +7,8 @@ export const useStore = defineStore('auth', {
     userInfo: {
       username: '', // 用户名
       email: '', // 用户邮箱
-      avatarSrc: ''// 用户头像的URL
+      avatarSrc: '',// 用户头像的URL
+      bio: '', // 用户简介''
     },
   }),
   actions: {
@@ -19,6 +20,12 @@ export const useStore = defineStore('auth', {
     },
     getUser(){
       return this.userInfo;
+    },
+    save(userInfo){
+      this.userInfo.username = userInfo.username;
+      this.userInfo.email = userInfo.email;
+      //this.userInfo.avatarSrc = userInfo.avatarSrc;
+      this.userInfo.bio = userInfo.preference?.bio??'';
     }
   },
 });
