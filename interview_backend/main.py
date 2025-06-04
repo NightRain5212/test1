@@ -2,8 +2,17 @@ from dotenv import load_dotenv
 import os  # 用于获取环境变量
 import subprocess
 import sys
+import shutil
+from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request, status
+# 添加项目根目录到Python路径
+current_dir = Path(__file__).parent
+sys.path.append(str(current_dir))
+
+from fastapi import FastAPI, HTTPException, Request, status, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from database import DatabaseManager
 
@@ -14,12 +23,21 @@ from passlib.context import CryptContext #用于密码哈希和验证
 import secrets  #用于生成安全的随机令牌
 from jose import jwt #jwt相关
 
-
-#from analyzer import main as analyzer #导入模块
+from analyzer import main as analyzer #导入模块
 
 # 创建实例化对象
 print(">>>>>>>>>>>>>>>>>>>>>加载对象实例<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 app = FastAPI()
+
+# 添加CORS中间件
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 在生产环境中应该设置具体的域名
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 db_manager = DatabaseManager()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")  # 用于密码哈希和验证
 # 配置JWT
@@ -28,9 +46,9 @@ print(">>>>>>>>>>>>>>>>>>>>>加载环境变量<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
-REFRESH_TOKEN_EXPIRE_MINUTES =int(os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES")) 
+REFRESH_TOKEN_EXPIRE_MINUTES =int(os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES"))
 
-#analyzer.run()#测试
+analyzer.run()#测试
 
 # 定义 Pydantic 模型
 class RefreshTokenRequest(BaseModel):
@@ -44,8 +62,7 @@ class RegisterRequest(BaseModel):
 class UserInfoRequest(BaseModel):
     id: int
     username: str
-    email: str =None
-    preference: Dict[str, Any] = {}  # 明确字典类型
+
 # 传入刷新令牌，获取新的访问令牌access_token和刷新令牌refresh_token
 @app.post("/api/auth/refresh")
 async def refresh_token(request: RefreshTokenRequest,meta:Request):
@@ -268,27 +285,6 @@ async def get_info(username: str):
     print("返回用户信息:", res)
     return res
 
-@app.post("/api/user/update_info")
-async def update_info(request: UserInfoRequest):
-    print(">>>>>>>>>>开始更新用户信息<<<<<<<<<<<<<<<<<")
-    # 查询用户信息
-    user = db_manager.select(
-        table="users",
-        conditions={"id": request.id}
-    )
-    if not user:
-        print("用户不存在")
-        return {"data": None,"code":0}  # 如果没有找到用户，返回空字典，不返回error
-
-    print("用户存在")
-    try:
-        db_manager.update(table="users",data={'username':request.username,'email':request.email},conditions={"user_id":user[0]["id"]})
-        db_manager.update(table="user_store",data=request.preference,conditions={"user_id":user[0]["id"]})
-        return {"data": "更新成功","code":1}
-    except Exception as e:
-        print("更新失败:", e)
-        return {"data": None,"code":0}
-    
 # 如果通过命令fastapi dev main.py，则不会执行下面的代码
 if __name__ == "__main__":
     # 使用 FastAPI CLI 启动应用

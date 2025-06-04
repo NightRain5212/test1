@@ -60,6 +60,7 @@
 <script setup>
 import { message } from 'ant-design-vue'
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useRouter } from 'vue-router'
 // import{addModal,Notice} from '../components/Notice/index.js';
 //摄像相关
 const isCameraActive = ref(false)
@@ -79,6 +80,8 @@ let cameraStream = null
 let audioContext = null
 let gainNode = null// 浏览器内置的音频处理节点
 let microphone = null// 用于连接麦克风
+
+const router = useRouter()
 
 //声音相关
 // 监听滑块值变化
@@ -220,39 +223,76 @@ async function saveRecording() {
   }
 
   try {
-    // // 停止录制
-    // if (isRecording.value) {
-    //   stopRecording()
-    // }
-
     // 创建Blob对象
     const blob = new Blob(recordedChunks.value, {
       type: 'video/webm'
     })
 
-    // 生成下载链接
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-    a.href = url
-    a.download = `recording-${timestamp}.webm`
-    
-    // 触发下载
-    document.body.appendChild(a)
-    a.click()
-    
-    // 清理
-    setTimeout(() => {
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-      recordedChunks.value = []
-    }, 100)
+    // 检查文件大小
+    const maxSize = 100 * 1024 * 1024 // 100MB
+    if (blob.size > maxSize) {
+      throw new Error(`文件大小超过限制：${(blob.size / 1024 / 1024).toFixed(2)}MB，最大允许100MB`)
+    }
 
-    message.success('录像已保存')
+    // 创建FormData对象
+    const formData = new FormData()
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const filename = `recording-${timestamp}.webm`
+    formData.append('file', new File([blob], filename, { type: 'video/webm' }))
+
+    message.loading({ content: '正在上传视频...', key: 'upload' })
+
+    // 上传到服务器
+    const response = await fetch('http://localhost:8000/api/upload', {
+      method: 'POST',
+      body: formData
+    })
+
+    let result
+    try {
+      result = await response.json()
+    } catch (e) {
+      throw new Error('服务器响应格式错误')
+    }
+
+    if (!response.ok) {
+      throw new Error(result.detail || '上传失败')
+    }
+
+    if (!result.data?.filepath) {
+      throw new Error('服务器返回的文件路径无效')
+    }
+
+    const savedVideoPath = result.data.filepath
+
+    // 清理
+    recordedChunks.value = []
+    islatest_save.value = true
+
+    message.success({ content: '上传成功', key: 'upload' })
+
+    // 显示确认弹窗
+    addModal({
+      message: '录像已保存，是否立即进行分析？',
+      onConfirm: () => {
+        // 将视频路径存储到 localStorage
+        localStorage.setItem('lastRecordedVideo', savedVideoPath)
+        // 跳转到报告页面
+        router.push('/report')
+      },
+      onCancel: () => {
+        message.info('您可以稍后在报告页面进行分析')
+      }
+    })
+
     return true
   } catch (error) {
     console.error('保存失败:', error)
-    message.error('保存失败')
+    message.error({ 
+      content: `保存失败: ${error.message}`, 
+      key: 'upload',
+      duration: 5 // 显示5秒
+    })
     return false
   }
 }
