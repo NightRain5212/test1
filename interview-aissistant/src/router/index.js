@@ -1,11 +1,32 @@
-
 import { createRouter, createWebHistory } from 'vue-router'
+import HomeView from '../views/HomeView.vue'
+import ReportView from '../views/ReportView.vue'
+import MyProfile from '../views/MyProfile.vue'
+import HistoryView from '../views/HistoryView.vue'
 
 const routes = [
   {
     path: '/',
-    name: 'homeView',//命名，home就可以代指url路径了
-    component: () => import('../views/HomeView.vue'),
+    name: 'home',
+    component: HomeView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/report',
+    name: 'report',
+    component: ReportView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/profile',
+    name: 'profile',
+    component: MyProfile,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/history',
+    name: 'history',
+    component: HistoryView,
     meta: { requiresAuth: true }
   },
   {
@@ -14,22 +35,10 @@ const routes = [
     component: () => import('../views/Login.vue'),
     meta: { requiresAuth: false }
   },
-    {
-    path: '/myProfile',
-    name: 'myProfile',//命名，home就可以代指url路径了
-    component: () => import('../views/MyProfile.vue'),
-    meta: { requiresAuth: true }
-  },
   {
     path: '/settings',
     name: 'settingsView',//命名，home就可以代指url路径了
     component: () => import('../views/SettingsView.vue'),
-    meta: { requiresAuth: true }
-  },
-    {
-    path: '/report',
-    name: 'reportView',//命名，home就可以代指url路径了
-    component: () => import('../views/ReportView.vue'),
     meta: { requiresAuth: true }
   }
 ]

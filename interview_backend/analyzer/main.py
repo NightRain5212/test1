@@ -10,7 +10,7 @@ import shutil
 # 添加当前目录到Python路径
 current_dir = Path(__file__).parent
 sys.path.append(str(current_dir))
-
+API_TOKEN = "YOUR_HUGGINGFACE_API_TOKEN"
 def check_ffmpeg():
     """检查是否安装了ffmpeg"""
     if shutil.which('ffmpeg') is None:
@@ -52,7 +52,7 @@ class InterviewAnalyzer:
         self.voice_analyzer = VoiceAnalyzer(model_size="base")
         self.text_analyzer = TextAnalyzer()
         self.scorer = InterviewScorer()
-        self.suggestion_generator = SuggestionGenerator()
+        self.suggestion_generator = SuggestionGenerator(api_token=API_TOKEN)
         self.resume_text = resume_text
         
         # 设置临时文件存储路径

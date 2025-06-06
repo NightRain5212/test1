@@ -346,6 +346,9 @@ const handleCancel = () => {
   width: 100%;
   height: 100%;
   border: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #333;
+  background-color: #f4f4f9;
 }
 
 .viewarea {
@@ -356,6 +359,8 @@ const handleCancel = () => {
   display: flex;
   justify-content: center;
   align-items: center;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
   
 .camera {
   width: 80%;
@@ -374,25 +379,29 @@ const handleCancel = () => {
 }
 
 .controlarea {
-  background: rgb(47, 45, 45);
+  background: #fff;
   height: 100%;
   display: flex;
   flex-direction: column; // 垂直排列按钮
   flex: 2;
   gap: 10px; // 按钮间距
   padding: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
 }
 
 .btn1 {
-  background: rgb(234, 230, 230);
+  background: #007bff;
   width: auto;
   height: 40px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
+  color: white;
+  transition: background-color 0.3s ease;
 
   &:hover {
-    background: rgb(220, 215, 215);
+    background: #0056b3;
   }
   &.recording {
     background: #231e1e;
@@ -465,8 +474,9 @@ const handleCancel = () => {
   display: flex;
   flex-direction: column;
   z-index: 999;
+  transition: opacity 0.3s ease;
   .modal-header {
-    background: #f5f5f5;
+    background: #007bff;
     height: 48px;
     width: 100%;
     display: flex;
@@ -476,7 +486,7 @@ const handleCancel = () => {
     
     h3 {
       margin: 0;
-      color: #262626;
+      color: white;
       font-size: 16px;
     }
   }
@@ -505,14 +515,14 @@ const handleCancel = () => {
       font-size: 14px;
       padding: 0 15px;
       border-radius: 4px;
-      transition: all 0.3s;
+      transition: background-color 0.3s ease;
       
       &.confirm {
-        background: #b8b9ba;
+        background: #28a745;
         color: white;
         
         &:hover {
-          background: #d5d8da;
+          background: #218838;
         }
         
         &:active {
@@ -521,11 +531,11 @@ const handleCancel = () => {
       }
       
       &.cancle {
-        background: rgb(151, 146, 146);
+        background: #dc3545;
         color: white;
         
         &:hover {
-          background: #d5d8da;
+          background: #c82333;
         }
         
         &:active {
