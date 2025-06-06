@@ -63,6 +63,13 @@ class UserInfoRequest(BaseModel):
     id: int
     username: str
 
+# 定义历史记录数据模型（如果需要）
+class HistoryRecord(BaseModel):
+    id: int
+    user_id: int
+    action: str
+    timestamp: datetime
+
 # 传入刷新令牌，获取新的访问令牌access_token和刷新令牌refresh_token
 @app.post("/api/auth/refresh")
 async def refresh_token(request: RefreshTokenRequest,meta:Request):
@@ -284,6 +291,63 @@ async def get_info(username: str):
     res={"data": user_info}
     print("返回用户信息:", res)
     return res
+
+# 查询历史记录的API端点
+@app.get("/api/history")
+async def get_history(user_id: int):
+    try:
+        # 从数据库中查询历史记录
+        history_records = db_manager.select(
+            table="history",
+            conditions={"user_id": user_id}
+        )
+        if not history_records:
+            return {"data": []}  # 返回空列表
+
+        # 返回查询结果
+        return {"data": history_records}
+    except Exception as e:
+        print("查询历史记录失败:", e)
+        raise HTTPException(status_code=500, detail="查询历史记录失败")
+
+# 保存分析结果到历史记录的API端点
+@app.post("/api/history")
+async def save_history(user_id: int, action: str, result: dict):
+    # 检查并创建历史记录表
+    table_exists = db_manager.execute("""
+        SELECT name FROM sqlite_master WHERE type='table' AND name='history';
+    """)
+
+    if not table_exists:
+        # 创建表
+        db_manager.execute("""
+            CREATE TABLE history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                action TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                result TEXT NOT NULL
+            );
+        """)
+        db_manager.commit()
+
+    try:
+        # 插入分析结果到历史记录表
+        db_manager.insert(
+            table="history",
+            data={
+                "user_id": user_id,
+                "action": action,
+                "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+                "result": result
+            }
+        )
+        db_manager.commit()
+        return {"message": "历史记录保存成功"}
+    except Exception as e:
+        db_manager.rollback()
+        print("保存历史记录失败:", e)
+        raise HTTPException(status_code=500, detail="保存历史记录失败")
 
 # 如果通过命令fastapi dev main.py，则不会执行下面的代码
 if __name__ == "__main__":

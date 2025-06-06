@@ -45,11 +45,8 @@ const items = reactive([
     getMenuItem('开始', '/', () => h(PlayCircleOutlined)),
     getMenuItem('报告', '/report', () => h(FileTextOutlined)),
   ]),
-  getMenuItem('历史', 'sub2', () => h(HistoryOutlined), [  // 改用 HistoryOutlined
-    getMenuItem('Option 5', '2.1', () => h(UnorderedListOutlined)),
-    getMenuItem('Option 6', '2.2', () => h(OrderedListOutlined)),
-  ]),
-  getMenuItem('设置', '/settings', () => h(SettingOutlined)), // 正确名称是 SettingOutlined
+  getMenuItem('历史记录', '/history', () => h(HistoryOutlined)),
+  getMenuItem('设置', '/settings', () => h(SettingOutlined)),
   getMenuItem('关于我们', 'sub4', () => h(TeamOutlined), [
     getMenuItem('Option 9', '4.1', () => h(InfoCircleOutlined)),
     getMenuItem('Option 10', '4.2', () => h(QuestionCircleOutlined)),
@@ -59,12 +56,12 @@ const items = reactive([
 
 // 菜单状态管理
 const menuState = reactive({
-  openKeys: [],
-  selectedKeys: []
+  openKeys: ['sub1'],
+  selectedKeys: ['/']
 });
 
 // 菜单展开/收起逻辑
-const rootSubmenuKeys = ['sub1', 'sub2', 'sub4'];// 移除项则不再可展开
+const rootSubmenuKeys = ['sub1', 'sub4'];// 更新可展开的菜单项
 //主要为了实现菜单的特效
 const onOpenChange = (openKeys) => {
   const latestOpenKey = openKeys.find(key => !menuState.openKeys.includes(key));

@@ -198,6 +198,39 @@ const initAnalysis = () => {
   console.log(`视频信息: ${videoEl.value.videoWidth}x${videoEl.value.videoHeight}, 时长: ${videoEl.value.duration}s`)
 }
 
+// 保存历史记录
+async function saveToHistory(result) {
+  try {
+    const userId = localStorage.getItem('userId') // 从localStorage获取用户ID
+    if (!userId) {
+      message.error('请先登录')
+      return
+    }
+
+    const response = await fetch('http://localhost:8000/api/history', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        user_id: parseInt(userId),
+        action: '视频分析',
+        result: result
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error('保存历史记录失败')
+    }
+
+    const data = await response.json()
+    console.log('历史记录保存成功:', data)
+  } catch (error) {
+    console.error('保存历史记录失败:', error)
+    message.error('保存历史记录失败')
+  }
+}
+
 // 开始分析
 async function startAnalysis() {
   if (!videoSrc.value) {
@@ -226,8 +259,8 @@ async function startAnalysis() {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        video_path: filename, // 只发送文件名
-        resume_text: '' // 如果需要，可以从其他地方获取简历文本
+        video_path: filename,
+        resume_text: ''
       })
     })
 
@@ -242,6 +275,9 @@ async function startAnalysis() {
     }
 
     analysisResult.value = result.data
+
+    // 保存分析结果到历史记录
+    await saveToHistory(result.data)
 
     message.success({ content: '分析完成', key: 'analysis' })
     // 更新图表
@@ -341,16 +377,25 @@ const stopDrag = () => {
   width: 100%;
   height: 100%;
   padding:10px;
-  background-color: #938a8a; /* 暗色背景 */ 
-    display: flex;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #333;
+  background-color: #f4f4f9;
+  display: flex;
   flex-direction: row;
 }
 .picture-analysis { 
     flex:8;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    background-color: #fff;
+    padding: 20px;
 }
 .video-analysis {
     background-color: #d99b9b; /* 侧边栏背景 */
     flex: 4;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    padding: 20px;
 }
 
 .video-analysis {
@@ -369,13 +414,22 @@ video {
   text-align: center;
 }
 
+.controls n-button {
+  background: #007bff;
+  color: white;
+  transition: background-color 0.3s ease;
+  &:hover {
+    background: #0056b3;
+  }
+}
+
 .chart-container {
   width: 100%;
   height: 400px;
-  border: 1px solid #eee;
-  border-radius: 4px;
+  border: none;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
 }
-
 
 /* 可拖动层样式 */
 .picture-analysis {
@@ -499,5 +553,14 @@ video {
 .chart-container {
   height: 300px;
   margin-top: 20px;
+}
+
+.n-progress {
+  .n-progress-rail {
+    background-color: #e0e0e0;
+  }
+  .n-progress-fill {
+    background-color: #2080f0;
+  }
 }
 </style>
