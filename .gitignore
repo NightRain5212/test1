@@ -1,4 +1,7 @@
-interview_analyzer/
 *.bat
 *.vbs
 run.txt
+.python-version
+interview_storage
+.html
+.idea

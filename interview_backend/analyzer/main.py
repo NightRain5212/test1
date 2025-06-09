@@ -37,7 +37,7 @@ from models.suggestion_generator import SuggestionGenerator
 
 # 添加项目根目录到系统路径
 sys.path.append(str(Path(__file__).parent.parent))
-from config import TEMP_DIR, AUDIO_DIR
+from config import TEMP_DIR, AUDIO_DIR,VIDEO_DIR
 
 class InterviewAnalyzer:
     def __init__(self, resume_text=""):
@@ -56,7 +56,8 @@ class InterviewAnalyzer:
         self.resume_text = resume_text
         
         # 设置临时文件存储路径
-        self.temp_dir = Path("D:/interview_temp")
+        #self.temp_dir = Path("D:/interview_temp")
+        self.temp_dir = Path(TEMP_DIR)
         # 确保临时目录存在
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         
@@ -202,7 +203,7 @@ class InterviewAnalyzer:
             }
 
 # 测试
-def run():
+def run(target_video="interview_video.mp4"):
     # 示例用法
     resume_text = """
     我是一名有5年经验的Python开发工程师，
@@ -211,9 +212,13 @@ def run():
     """
     
     analyzer = InterviewAnalyzer(resume_text)
-    
+
+    # 转换为字符串形式的路径
+    video_path = str(VIDEO_DIR / target_video)
+
     try:
-        result = analyzer.analyze_interview("interview_video.mp4")
+        #result = analyzer.analyze_interview("interview_video.mp4")
+        result = analyzer.analyze_interview(video_path)
         print("\n=== 面试分析结果 ===")
         print(f"总分: {result['scores']['total']:.2f}")
         print("\n=== 分项得分 ===")

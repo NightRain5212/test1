@@ -48,7 +48,8 @@ ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
 REFRESH_TOKEN_EXPIRE_MINUTES =int(os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES"))
 
-analyzer.run()#测试
+#analyzer.run("demo-video.mp4")#测试
+#analyzer.run()#测试
 
 # 定义 Pydantic 模型
 class RefreshTokenRequest(BaseModel):
