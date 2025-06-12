@@ -5,12 +5,12 @@ import re # 用于正则表达式
 from typing import Dict, List, Optional, Union,Any,Tuple # 导入类型提示
 from contextlib import contextmanager  # 用于上下文管理器
 
-#数据库：username/password/email/created_data(data类型)
 class DatabaseManager:
     def __init__(self):
         """初始化数据库连接"""
         print("开始初始化数据库-----------------------------------------")
-        dotenv.load_dotenv()
+        dotenv.load_dotenv('env')
+        dotenv.load_dotenv('env.secret')
         self.DB_HOST = os.getenv("DB_HOST")
         self.DB_PASSWORD = os.getenv("DB_PASSWORD")
         self.DB_PORT = os.getenv("DB_PORT")
