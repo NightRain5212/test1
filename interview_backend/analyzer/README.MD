@@ -91,7 +91,7 @@ print("建议:", result["suggestions"])
 
 - Python 3.x
 - OpenCV (cv2)
-- NumPy
+- NumPy 1.26.4
 - ffmpeg（用于音频提取）
 
 ## 7. 注意事项

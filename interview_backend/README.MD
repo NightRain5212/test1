@@ -35,14 +35,19 @@ POST /api/upload
 - 功能：上传视频文件
 - 请求体：multipart/form-data
 - 参数：
-  - file: 视频文件（支持格式：webm, mp4）
+  - file: 视频文件（支持格式：webm, mp4）（可选）
+  - file: 音频文件（可选）
+  - file: 图片文件（可选）
 - 返回：
   ```json
   {
-    "code": 200,
-    "data": {
-      "filepath": "string"
-    }
+      "code": 200,
+      "message": "文件上传成功",
+      "data": {
+        none/"video_url": "string",
+        none/"audio_url":"string",
+        none/"image_url":"string"
+      }
   }
   ```
 

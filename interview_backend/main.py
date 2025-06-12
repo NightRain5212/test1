@@ -4,7 +4,8 @@ import subprocess
 import sys
 import shutil
 from pathlib import Path
-
+import uuid
+import json
 # 添加项目根目录到Python路径
 current_dir = Path(__file__).parent
 sys.path.append(str(current_dir))
@@ -24,7 +25,7 @@ import secrets  #用于生成安全的随机令牌
 from jose import jwt #jwt相关
 
 from analyzer import main as analyzer #导入模块
-
+from  FileManager import FileManager
 # 创建实例化对象
 print(">>>>>>>>>>>>>>>>>>>>>加载对象实例<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 app = FastAPI()
@@ -39,14 +40,20 @@ app.add_middleware(
 )
 
 db_manager = DatabaseManager()
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")  # 用于密码哈希和验证
 # 配置JWT
-load_dotenv()  # 先加载原始 .env
+load_dotenv(".env")  # 先加载原始 .env
+load_dotenv(".env.secret")
 print(">>>>>>>>>>>>>>>>>>>>>加载环境变量<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
 REFRESH_TOKEN_EXPIRE_MINUTES =int(os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES"))
+OSS_ACCESS_KEY_ID = os.getenv("OSS_ACCESS_KEY_ID")
+OSS_ACCESS_KEY_SECRET = os.getenv("OSS_ACCESS_KEY_SECRET")
+
+file_manager = FileManager(OSS_ACCESS_KEY_ID,OSS_ACCESS_KEY_SECRET,"interviewresource","https://cn.aliyun.com/")
 
 #analyzer.run("demo-video.mp4")#测试
 #analyzer.run()#测试
@@ -70,6 +77,15 @@ class HistoryRecord(BaseModel):
     user_id: int
     action: str
     timestamp: datetime
+class UploadRequest(BaseModel):
+    video: Optional[UploadFile] = File(None)
+    audio: Optional[UploadFile] = File(None)
+    image: Optional[UploadFile] = File(None)
+class UpdataRequest(BaseModel):
+    id: int
+    username: str=""
+    email: str=""
+    preferences: Dict[str, Any] = {} #user_store中直接存储json
 
 # 传入刷新令牌，获取新的访问令牌access_token和刷新令牌refresh_token
 @app.post("/api/auth/refresh")
@@ -198,9 +214,11 @@ async def register(request: RegisterRequest):
             "password": request.password, # 注意：实际应用中应先哈希密码
             "created_data":created_at
         })
+        db_manager.commit()
         return {"data": "注册成功"}
     except Exception as e:
         print("注册失败:", e)
+        db_manager.rollback()
         raise HTTPException(status_code=500, detail="用户注册失败")
 
 # 返回令牌，更新用户状态，刷新令牌
@@ -265,9 +283,19 @@ async def login(request: RegisterRequest,meta: Request):#request使用pydantic�
     }    
     print("返回响应:", res)
     return res
-# 传入查询参数，至少会包括用户名
+# 传入用户名，返回用户相关信息
 @app.get("/api/user/get_info")
 async def get_info(username: str):
+    #自动转换json为词典
+    def safe_get_json(field):
+        if field is None:
+            return None
+        if isinstance(field, dict):  # 如果驱动已自动转换
+            return field
+        try:
+            return json.loads(field)
+        except (TypeError, json.JSONDecodeError):
+            return None
     print(">>>>>>>>>>开始查询用户信息<<<<<<<<<<<<<<<<<")
     # 查询用户信息
     user = db_manager.select(
@@ -281,14 +309,27 @@ async def get_info(username: str):
     # 返回用户信息（隐藏敏感信息，如密码）
     print("用户存在")
     print(user)
+    #查询用户存储信息
+    user_store = db_manager.select(
+        table="user_store",
+        conditions={"user_id": user["id"]}
+    )
+    
+    try:
+        preference =safe_get_json(user_store[0]["user_preference"] if user_store else None)
+    except Exception as e:
+        print("解析用户偏好失败:", e)
+        preference=None
     user_info = {
         "id": user[0]["id"],
         "username": user[0]["username"],
         "email": user[0]["email"],
-        "password": user[0]["password"],  # 注意：实际不应返回密码字段
-        "created_data": user[0]["created_data"].strftime("%Y-%m-%d") if user[0]["created_data"] else None #转换日期格式
+        "password": user[0]["password"], 
+        "created_data": user[0]["created_data"].strftime("%Y-%m-%d") if user[0]["created_data"] else None ,#转换日期格式
+        "preference":preference,
     }
     print(user_info)
+
     res={"data": user_info}
     print("返回用户信息:", res)
     return res
@@ -349,6 +390,100 @@ async def save_history(user_id: int, action: str, result: dict):
         db_manager.rollback()
         print("保存历史记录失败:", e)
         raise HTTPException(status_code=500, detail="保存历史记录失败")
+
+@app.post("/api/upload")
+async def upload(request: UploadRequest):
+    result = {}
+    try:
+        # 检查是否有文件上传
+        if not any([request.video, request.audio, request.image]):
+            return {
+            "code": 400,
+            "message": "没有要上传的文件",
+            "data": None
+            }
+
+        # 处理视频文件
+        if request.video and request.video.filename:
+            video_ext = os.path.splitext(request.video.filename)[1]
+            video_key = f"video/{datetime.now().strftime('%Y%m%d')}/{uuid.uuid4().hex}{video_ext}"
+            result["video_url"]= file_manager.upload_file(request.video.file, video_key)
+
+        # 处理音频文件
+        if request.audio and request.audio.filename:
+            audio_ext = os.path.splitext(request.audio.filename)[1]
+            audio_key = f"audio/{datetime.now().strftime('%Y%m%d')}/{uuid.uuid4().hex}{audio_ext}"
+            result["audio_url"]=file_manager.upload_file(request.audio.file, audio_key)
+
+        # 处理图片文件
+        if request.image and request.image.filename:
+            image_ext = os.path.splitext(request.image.filename)[1]
+            image_key = f"img/{datetime.now().strftime('%Y%m%d')}/{uuid.uuid4().hex}{image_ext}"
+            result["image_url"] =file_manager.upload_file(request.image.file, image_key)
+
+        return {
+            "code": 200,
+            "message": "文件上传成功",
+            "data": result
+        }
+
+    except Exception as e:
+        print("文件上传失败:", e)
+        return{
+            "code": 500,
+            "message": "文件上传失败",
+            "data": None
+        }
+
+@app.post("/api/update")
+async def update(request: UpdataRequest):
+    #更新users表
+    try:
+        db_manager.update(
+            table="users",
+            data={
+                "username": request.username,
+                "email": request.email,
+            },
+            conditions={"id": request.id}
+        )
+        db_manager.commit()
+    except Exception as e:
+        print("更新user表失败:",e)
+        db_manager.rollback()
+    tmp_user = db_manager.select(
+        table="users_store",
+        conditions={"id": request.id}
+    )
+    #如果是首次更新
+    if not tmp_user:
+        try:
+            db_manager.insert(
+                table="user_store",
+                data={
+                    "user_id": request.id,
+                    "user_preference": json.dumps(request.preference)  # 显式转换为JSON字符串
+                }
+            )
+            db_manager.commit()
+        except Exception as e:
+            print("插入user_store表失败:",e)
+            db_manager.rollback()
+    else:
+        #更新user_store表
+        try:
+            db_manager.update(
+                table="user_store",
+                data={
+                    "user_preference": json.dumps(request.preference)  # 显式转换为JSON字符串
+                },
+                conditions={"id": request.id}
+            )
+            db_manager.commit()
+        except Exception as e:
+            print("更新user_store表失败:",e)
+            db_manager.rollback()
+    return {"message": "更新成功","data": ""}
 
 # 如果通过命令fastapi dev main.py，则不会执行下面的代码
 if __name__ == "__main__":
