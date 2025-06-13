@@ -14,11 +14,9 @@ from fastapi import FastAPI, HTTPException, Request, status, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-from database import DatabaseManager
-
+from pydantic import BaseModel,Field#Field用于设置字段的属性，如必填、默认值等
 from datetime import datetime, timedelta #timedelta类可以参与datatime的加减
-from typing import Optional,Dict,Any
+from typing import Optional,Dict,Any,List
 
 from passlib.context import CryptContext #用于密码哈希和验证
 import secrets  #用于生成安全的随机令牌
@@ -26,6 +24,8 @@ from jose import jwt #jwt相关
 
 from analyzer import main as analyzer #导入模块
 from  FileManager import FileManager
+from database import DatabaseManager
+
 # 创建实例化对象
 print(">>>>>>>>>>>>>>>>>>>>>加载对象实例<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 app = FastAPI()
@@ -39,12 +39,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-db_manager = DatabaseManager()
-
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")  # 用于密码哈希和验证
 # 配置JWT
-load_dotenv(".env")  # 先加载原始 .env
-load_dotenv(".env.secret")
+load_dotenv(".env")
+load_dotenv(".env.secret")#叠加加载
 print(">>>>>>>>>>>>>>>>>>>>>加载环境变量<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
@@ -53,6 +51,7 @@ REFRESH_TOKEN_EXPIRE_MINUTES =int(os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES"))
 OSS_ACCESS_KEY_ID = os.getenv("OSS_ACCESS_KEY_ID")
 OSS_ACCESS_KEY_SECRET = os.getenv("OSS_ACCESS_KEY_SECRET")
 
+db_manager = DatabaseManager()
 file_manager = FileManager(OSS_ACCESS_KEY_ID,OSS_ACCESS_KEY_SECRET,"interviewresource","https://cn.aliyun.com/")
 
 #analyzer.run("demo-video.mp4")#测试
@@ -61,17 +60,13 @@ file_manager = FileManager(OSS_ACCESS_KEY_ID,OSS_ACCESS_KEY_SECRET,"interviewres
 # 定义 Pydantic 模型
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
-
 class RegisterRequest(BaseModel):
     username: str
     email: str =None
     password: str
-
 class UserInfoRequest(BaseModel):
     id: int
     username: str
-
-# 定义历史记录数据模型（如果需要）
 class HistoryRecord(BaseModel):
     id: int
     user_id: int
@@ -86,7 +81,8 @@ class UpdataRequest(BaseModel):
     username: str=""
     email: str=""
     preferences: Dict[str, Any] = {} #user_store中直接存储json
-
+class DownLoadRequest(BaseModel):
+    urls: List[str] = Field(..., max_items=10, description="要下载的文件URL列表，最多10个")
 # 传入刷新令牌，获取新的访问令牌access_token和刷新令牌refresh_token
 @app.post("/api/auth/refresh")
 async def refresh_token(request: RefreshTokenRequest,meta:Request):
@@ -484,6 +480,29 @@ async def update(request: UpdataRequest):
             print("更新user_store表失败:",e)
             db_manager.rollback()
     return {"message": "更新成功","data": ""}
+
+@app.post("/api/download")
+async def download(request: DownLoadRequest):
+    try:
+        # 下载文件并打包
+        zip_path = file_manager.download_files(request.urls)
+
+        # 返回zip文件
+        return FileResponse(
+            zip_path,
+            filename="download.zip",
+            media_type="application/zip",
+            headers={"Content-Disposition": "attachment; filename=download.zip"}
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        # 清理临时文件
+        if 'zip_path' in locals() and os.path.exists(zip_path):
+            temp_dir = os.path.dirname(zip_path)
+            import shutil
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
 # 如果通过命令fastapi dev main.py，则不会执行下面的代码
 if __name__ == "__main__":

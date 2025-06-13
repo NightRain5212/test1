@@ -2,6 +2,13 @@ import oss2
 from oss2 import Bucket, Auth
 from typing import Optional
 import urllib.parse#用于url编码
+import os
+import tempfile#用于创建临时目录,供前端下载文件
+import zipfile#用于压缩文件
+from fastapi import HTTPException
+from fastapi.responses import FileResponse
+from typing import List
+
 class FileManager:
     def __init__(self, access_key_id: str, access_key_secret: str, bucket_name: str, endpoint: str):
         """
@@ -93,3 +100,57 @@ class FileManager:
         bucket = self.connect()
         objects = oss2.ObjectIterator(bucket, prefix=prefix, delimiter=delimiter)
         return [obj.key for obj in objects]
+
+    def download_files(self, urls: List[str], max_files: int = 10) -> str:
+        """
+        批量下载OSS文件到本地临时目录并打包为zip
+        :param urls: 文件URL列表
+        :param max_files: 最大允许下载数量
+        :return: 临时zip文件路径
+        """
+        if len(urls) > max_files:
+            raise ValueError(f"一次最多下载{max_files}个文件")
+
+        # 创建临时目录
+        temp_dir = tempfile.mkdtemp()
+        zip_path = os.path.join(temp_dir, "download.zip")
+
+        try:
+            with zipfile.ZipFile(zip_path, 'w') as zipf:
+                for index, url in enumerate(urls):
+                    try:
+                        # 从URL中提取object key
+                        object_key = self._extract_object_key(url)
+                        if not object_key:
+                            continue
+                        # 下载文件到临时目录给前端下载,保证顺序
+                        temp_file = os.path.join(temp_dir, f"{index}_{os.path.basename(object_key)}")
+
+                        # 下载并添加到ZIP（保持原始顺序）
+                        self._download_single_file(object_key, temp_file)
+                        zipf.write(temp_file, arcname=f"{index}_{os.path.basename(object_key)}")
+
+                        os.remove(temp_file)  # 删除临时文件
+
+                    except Exception as e:
+                        print(f"下载文件 {url} 失败: {str(e)}")
+                        continue
+
+            return zip_path
+
+        except Exception as e:
+            import shutil
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            raise HTTPException(status_code=500, detail=f"创建下载包失败: {str(e)}")
+
+    def _extract_object_key(self, url: str) -> Optional[str]:
+        """从OSS URL中提取object key"""
+        base_url = f"https://{self.bucket_name}.{self.endpoint.replace('https://', '')}/"
+        if url.startswith(base_url):
+            return url[len(base_url):]
+        return None
+
+    def _download_single_file(self, object_key: str, save_path: str):
+        """下载单个文件到本地"""
+        bucket = self.connect()
+        bucket.get_object_to_file(object_key, save_path)

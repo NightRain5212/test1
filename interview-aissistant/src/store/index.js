@@ -7,9 +7,17 @@ export const useStore = defineStore('auth', {
     userInfo: {
       username: '', // 用户名
       email: '', // 用户邮箱
+
       avatarSrc: '',// 用户头像的URL
       bio: '', // 用户简介''
     },
+    //存储实际文件数据
+    userFiles: {
+      images: [],    // 图片文件
+      audios: [],     // 音频文件
+      videos: [],     // 视频文件
+      documents: []   // 其他文档
+    }
   }),
   actions: {
     login() {
@@ -21,11 +29,39 @@ export const useStore = defineStore('auth', {
     getUser(){
       return this.userInfo;
     },
-    save(userInfo){
+    setUser(userInfo){
       this.userInfo.username = userInfo.username;
       this.userInfo.email = userInfo.email;
-      //this.userInfo.avatarSrc = userInfo.avatarSrc;
+
+      this.userInfo.avatarSrc = userInfo.preference?.avatarSrc??'';
       this.userInfo.bio = userInfo.preference?.bio??'';
+    },
+    // 文件操作方法
+    saveFiles(files) {
+      files.forEach(file => {
+        const type = this._getFileType(file.name);
+        this.userFiles[type].push(file);
+      });
+    },
+    clearFiles() {
+      this.userFiles = {
+        images: [],
+        audios: [],
+        videos: [],
+        documents: []
+      };
+    },
+    // 私有方法 - 根据文件名判断文件类型
+    _getFileType(filename) {
+      const extension = filename.split('.').pop().toLowerCase();
+      const imageTypes = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+      const audioTypes = ['mp3', 'wav', 'ogg'];
+      const videoTypes = ['mp4', 'webm', 'mov'];
+      
+      if (imageTypes.includes(extension)) return 'images';
+      if (audioTypes.includes(extension)) return 'audios';
+      if (videoTypes.includes(extension)) return 'videos';
+      return 'documents';
     }
   },
 });

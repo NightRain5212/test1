@@ -153,7 +153,6 @@ function closeLoginForm (){
             formBox.style.height = '300px';
         }
     }, 300);
-
 }
 
 async function performLogin(input_info) {
@@ -222,8 +221,13 @@ async function handleLoginSuccess(input_info,res) {
         // 存储令牌
         localStorage.setItem('accessToken', tokenRes.data.access_token);
         localStorage.setItem('refreshToken', tokenRes.data.refresh_token);
-        localStorage.setItem('id', res.id);
-        store.save(res)
+        localStorage.setItem('id', res.id);//用户id存储在localStorage中
+
+        store.setUser(res)
+        // 异步下载文件（不阻塞登录流程）
+        DownloadFile()
+            .then(() => message.success('文件加载完成'))
+            .catch(() => message.warning('文件加载失败'));
         startTokenRefresh(tokenRes.data.expired_in);
         message.success(`欢迎回来，${input_info.username}!`);
         display_loginform.value = false; // 关闭登录界面
@@ -425,7 +429,80 @@ function switchMode() {
         formBox.style.height = '300px';
     }
 }
+//上传url地址，然后从临时目录下载文件到本地
+async function downloadAndUnzip(zipUrl) {
+  try {
+    const response = await fetch(zipUrl);
+    const blob = await response.blob();
+    const zip = new JSZip();
+    const contents = await zip.loadAsync(blob);
+    
+    const files = [];
+    for (const filename in contents.files) {
+      if (!contents.files[filename].dir) {
+        const fileBlob = await contents.files[filename].async('blob');
+        files.push({
+          name: filename,
+          blob: fileBlob,
+          url: URL.createObjectURL(fileBlob)
+        });
+      }
+    }
+    return files;
+  } catch (error) {
+    console.error('解压失败:', error);
+    throw error;
+  }
+}
 
+async function DownloadFile() {
+  try {
+    // 1. 获取下载URL列表（假设store.geturl()返回URL数组）
+    const urls = store.geturl();
+    
+    // 2. 调用后端下载接口
+    const response = await axios.post("/api/download", {
+      urls: urls,
+      max_files: 10 // 可配置
+    }, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+      }
+    });
+    
+    // 3. 下载并解压ZIP
+    const zipFiles = await downloadAndUnzip(response.data.zip_url);
+    
+    // 4. 按原始顺序排序
+    zipFiles.sort((a, b) => {
+      const aIdx = parseInt(a.name.split('_')[0]);
+      const bIdx = parseInt(b.name.split('_')[0]);
+      return aIdx - bIdx;
+    });
+    
+    // 5. 重构文件信息
+    const files = zipFiles.map((file, index) => ({
+      originalUrl: response.data.files[index].original_url,
+      name: file.name.split('_').slice(1).join('_'), // 移除序号
+      blob: file.blob,
+      url: file.url,
+      type: store._getFileType(file.name)
+    }));
+    
+    // 6. 存储到store
+    store.saveFiles(files);
+    
+    // 7. 清理临时URL（可选）
+    setTimeout(() => {
+      files.forEach(file => URL.revokeObjectURL(file.url));
+    }, 5000);
+    
+    return files;
+  } catch (error) {
+    console.error('文件下载失败:', error);
+    throw error;
+  }
+}
 </script>
 <style scoped lang="scss">
 .main-all {

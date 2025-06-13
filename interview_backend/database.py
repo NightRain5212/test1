@@ -9,8 +9,6 @@ class DatabaseManager:
     def __init__(self):
         """初始化数据库连接"""
         print("开始初始化数据库-----------------------------------------")
-        dotenv.load_dotenv('env')
-        dotenv.load_dotenv('env.secret')
         self.DB_HOST = os.getenv("DB_HOST")
         self.DB_PASSWORD = os.getenv("DB_PASSWORD")
         self.DB_PORT = os.getenv("DB_PORT")
