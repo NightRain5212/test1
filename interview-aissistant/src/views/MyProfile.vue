@@ -2,77 +2,91 @@
     <div class="main_all">
         <n-grid :y-gap="0" :cols="1">
             <n-grid-item :style="{ 'background-color': '#c6b9b9' }">
-                <div class="header">
-                    <div class="header_left">
-                        <user-avatar />
-                    </div>
-                    <div class="header_right">
-                        <!-- 用户名行 -->
-                        <div class="userinfo">
-                            <span style="user-select: none;">用户名:</span>
-                            <n-input v-if="editing.username" v-model:value="tempUsername" 
-                            style=" width: 200px;height:30px;margin-left: 10px; border-color: #1890ff;border-radius: 4px;  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);" 
-                            @blur=" is_saveEdit('username')" />
-                            <n-text v-else
-                                style="margin-left: 10px; width: 200px; display: inline-block;user-select: none;">
-                                {{ username }}
-                            </n-text>
-                            <n-button text @click="toggleEdit('username')" style="margin-left: 5px;">
-                                <n-icon size="18">
-                                    <Edit />
-                                </n-icon>
-                            </n-button>
-                            <n-button text @click="copyToClipboard(username)" style="margin-left: 5px;">
-                                <n-icon size="18">
-                                    <Copy />
-                                </n-icon>
-                            </n-button>
+                <div v-if="isLoggedIn" class="profile-content">
+                    <div class="header">
+                        <div class="header_left">
+                            <user-avatar />
                         </div>
+                        <div class="header_right">
+                            <!-- 用户名行 -->
+                            <div class="userinfo">
+                                <span style="user-select: none;">用户名:</span>
+                                <n-input v-if="editing.username" v-model:value="tempUsername" 
+                                style=" width: 200px;height:30px;margin-left: 10px; border-color: #1890ff;border-radius: 4px;  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);" 
+                                @blur=" is_saveEdit('username')" />
+                                <n-text v-else
+                                    style="margin-left: 10px; width: 200px; display: inline-block;user-select: none;">
+                                    {{ username }}
+                                </n-text>
+                                <n-button text @click="toggleEdit('username')" style="margin-left: 5px;">
+                                    <n-icon size="18">
+                                        <Edit />
+                                    </n-icon>
+                                </n-button>
+                                <n-button text @click="copyToClipboard(username)" style="margin-left: 5px;">
+                                    <n-icon size="18">
+                                        <Copy />
+                                    </n-icon>
+                                </n-button>
+                            </div>
 
-                        <!-- 邮箱行 -->
-                        <div class="userinfo">
-                            <span style="user-select: none;">邮箱:</span>
-                            <n-input v-if="editing.email" v-model:value="tempEmail"
-                                style="width: 200px;height:30px; margin-left: 10px;" @blur="is_saveEdit('email')" />
-                            <n-text v-else
-                                style="margin-left: 10px; width: 200px; display: inline-block; user-select: none;">
-                                {{ email }}
-                            </n-text>
-                            <n-button text @click="toggleEdit('email')" style="margin-left: 5px;">
-                                <n-icon size="18">
-                                    <Edit />
-                                </n-icon>
-                            </n-button>
-                            <n-button text @click="copyToClipboard(username)" style="margin-left: 5px;">
-                                <n-icon size="18">
-                                    <Copy />
-                                </n-icon>
-                            </n-button>
+                            <!-- 邮箱行 -->
+                            <div class="userinfo">
+                                <span style="user-select: none;">邮箱:</span>
+                                <n-input v-if="editing.email" v-model:value="tempEmail"
+                                    style="width: 200px;height:30px; margin-left: 10px;" @blur="is_saveEdit('email')" />
+                                <n-text v-else
+                                    style="margin-left: 10px; width: 200px; display: inline-block; user-select: none;">
+                                    {{ email }}
+                                </n-text>
+                                <n-button text @click="toggleEdit('email')" style="margin-left: 5px;">
+                                    <n-icon size="18">
+                                        <Edit />
+                                    </n-icon>
+                                </n-button>
+                                <n-button text @click="copyToClipboard(username)" style="margin-left: 5px;">
+                                    <n-icon size="18">
+                                        <Copy />
+                                    </n-icon>
+                                </n-button>
+                            </div>
                         </div>
+                    </div>
+
+                    <!-- 个人简介 -->
+                    <div class="userinfo">
+                        <span style="user-select: none; padding-left:20px">个人简介:</span>
+                        <n-input v-if="editing.bio" v-model:value="tempBio" 
+                            style="width: 300px;height:30px; margin-left: 10px; vertical-align: top;"
+                            @blur="is_saveEdit('bio')" />
+                        <n-text v-else style="margin-left: 10px; width: 300px; display: inline-block;user-select: none;">
+                            {{ bio }}
+                        </n-text>
+                        <n-button text @click="toggleEdit('bio')" style="margin-left: 5px; vertical-align: top;">
+                            <n-icon size="18">
+                                <Edit />
+                            </n-icon>
+                        </n-button>
+                        <n-button text @click="copyToClipboard(username)" style="margin-left: 5px;">
+                            <n-icon size="18">
+                                <Copy />
+                            </n-icon>
+                        </n-button>
                     </div>
                 </div>
-
-                <!-- 个人简介 -->
-                <div class="userinfo">
-                    <span style="user-select: none; padding-left:20px">个人简介:</span>
-                    <n-input v-if="editing.bio" v-model:value="tempBio" 
-                        style="width: 300px;height:30px; margin-left: 10px; vertical-align: top;"
-                         @blur="is_saveEdit('bio')" />
-                    <n-text v-else style="margin-left: 10px; width: 300px; display: inline-block;user-select: none;">
-                        {{ bio }}
-                    </n-text>
-                    <n-button text @click="toggleEdit('bio')" style="margin-left: 5px; vertical-align: top;">
-                        <n-icon size="18">
-                            <Edit />
-                        </n-icon>
-                    </n-button>
-                    <n-button text @click="copyToClipboard(username)" style="margin-left: 5px;">
-                        <n-icon size="18">
-                            <Copy />
-                        </n-icon>
-                    </n-button>
+                <div v-else class="login-prompt">
+                    <n-result
+                        status="warning"
+                        title="未登录"
+                        description="请先登录以查看个人信息"
+                    >
+                        <template #footer>
+                            <n-button type="primary" @click="goToLogin">
+                                前往登录
+                            </n-button>
+                        </template>
+                    </n-result>
                 </div>
-
             </n-grid-item>
 
             <n-grid-item :style="{ 'background-color': 'black' }">
@@ -101,24 +115,25 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue';
+import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue';
 import UserAvatar from '../components/UserAvatar.vue';
 import { message } from 'ant-design-vue'
-import { NGrid, NGridItem, NButton, NIcon, NInput, NText } from 'naive-ui'
+import { NGrid, NGridItem, NButton, NIcon, NInput, NText, NResult } from 'naive-ui'
 import { Edit, Copy } from '@vicons/carbon'
 import axios from "../utils/axios";
 import { useStore } from '../store';
+import { useRouter } from 'vue-router';
 import rules from '../utils/rules'
+
 const store = useStore();
+const router = useRouter();
+const isLoggedIn = computed(() => store.isLoggedIn);
+
+// 如果已登录，获取用户信息
 const userInfo = ref(store.getUser())
-//const avatarUrl = userInfo.value.avatarUrl; //临时测试用
-// 用户数据
-// const username = ref('张三')
-// const email = ref('zhangsan@example.com')
-// const bio = ref('还没有添加任何自我介绍~~~')
-const username = userInfo.value.username;
-const email = userInfo.value.email;
-const bio = userInfo.value.bio;
+const username = ref(userInfo.value.username || '');
+const email = ref(userInfo.value.email || '');
+const bio = ref(userInfo.value.bio || '还没有添加任何自我介绍~~~');
 
 // 临时编辑数据
 const tempUsername = ref('')
@@ -131,6 +146,17 @@ const editing = ref({
     email: false,
     bio: false
 })
+
+// 跳转到登录页面
+const goToLogin = () => {
+    router.push({
+        path: '/login',
+        query: { 
+            redirect: router.currentRoute.value.fullPath,
+            showLogin: 'true'
+        }
+    });
+};
 
 // 切换编辑状态
 const toggleEdit = (field) => {
@@ -247,6 +273,27 @@ const handleCancel = () => {
     //background-color: #5e5b5b; /* 暗色背景 */
     padding: 20px;
     color: white;
+}
+
+.profile-content {
+    width: 100%;
+    height: 100%;
+}
+
+.login-prompt {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+    
+    :deep(.n-result) {
+        background: rgba(255, 255, 255, 0.9);
+        padding: 40px;
+        border-radius: 8px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+    }
 }
 
 .header {

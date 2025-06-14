@@ -268,3 +268,101 @@ POST /api/update
 
 4.可以导入校园社区，区分学长校友，咨询获得建议。
 
+#### GET 获取历史记录
+
+GET /api/history
+
+###### 请求参数
+
+|名称|位置|类型|必选|说明|
+|---|---|---|---|---|
+|user_id|query|integer| 是 |用户ID|
+|start_date|query|string| 否 |开始日期 (YYYY-MM-DD)|
+|end_date|query|string| 否 |结束日期 (YYYY-MM-DD)|
+|page|query|integer| 否 |页码，默认1|
+|page_size|query|integer| 否 |每页记录数，默认10|
+
+> 返回示例
+
+```json
+{
+  "code": 200,
+  "data": {
+    "total": 25,
+    "items": [
+      {
+        "id": 1,
+        "user_id": 10,
+        "created_at": "2024-03-20T10:30:00",
+        "interview_type": "单人模式",
+        "duration": 1800,
+        "facial_score": 85,
+        "voice_score": 90,
+        "content_score": 88,
+        "overall_score": 87.6,
+        "suggestions": "表情自然，声音清晰，建议加强专业术语的使用",
+        "video_url": "path/to/video",
+        "audio_url": "path/to/audio"
+      }
+    ]
+  }
+}
+```
+
+#### DELETE 删除历史记录
+
+DELETE /api/history/{record_id}
+
+###### 请求参数
+
+|名称|位置|类型|必选|说明|
+|---|---|---|---|---|
+|record_id|path|integer| 是 |记录ID|
+
+> 返回示例
+
+```json
+{
+  "code": 200,
+  "message": "删除成功"
+}
+```
+
+#### POST 保存面试记录
+
+POST /api/history
+
+> Body 请求参数
+
+```json
+{
+  "user_id": 10,
+  "interview_type": "单人模式",
+  "duration": 1800,
+  "facial_score": 85,
+  "voice_score": 90,
+  "content_score": 88,
+  "suggestions": "表情自然，声音清晰，建议加强专业术语的使用",
+  "video_url": "path/to/video",
+  "audio_url": "path/to/audio"
+}
+```
+
+###### 请求参数
+
+|名称|位置|类型|必选|说明|
+|---|---|---|---|---|
+|body|body|object| 是 |面试记录信息|
+
+> 返回示例
+
+```json
+{
+  "code": 200,
+  "message": "保存成功",
+  "data": {
+    "id": 1
+  }
+}
+```
+

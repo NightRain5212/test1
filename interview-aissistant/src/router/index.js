@@ -3,6 +3,7 @@ import HomeView from '../views/HomeView.vue'
 import ReportView from '../views/ReportView.vue'
 import MyProfile from '../views/MyProfile.vue'
 import HistoryView from '../views/HistoryView.vue'
+import Login from '../views/Login.vue'  // 直接导入Login组件
 
 const routes = [
   {
@@ -32,7 +33,7 @@ const routes = [
   {
     path: '/login',
     name: 'login',
-    component: () => import('../views/Login.vue'),
+    component: Login,  // 直接使用导入的组件
     meta: { requiresAuth: false }
   },
   {
@@ -55,19 +56,24 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('accessToken');
   console.log('获取token',token)
-  const isAuthenticated = !!token; // 明确转换为布尔值
+  const isAuthenticated = !!token;
   
-  // 情况1：访问需要认证但未登录的路由
-  if (to.matched.some(record => record.meta.requiresAuth) && !isAuthenticated) {
-    return next({ 
-      path: '/login',
-      query: { redirect: to.fullPath } // 保存目标路由便于登录后跳转
-    });
+  // 如果目标路由是登录页，直接放行
+  if (to.path === '/login') {
+    next();
+    return;
   }
-
-  // 情况2：已登录但访问登录页（重定向到首页）
-  if (isAuthenticated && to.path === '/login') {
-    return next('/');
+  
+  // 需要认证但未登录的路由
+  if (to.matched.some(record => record.meta.requiresAuth) && !isAuthenticated) {
+    next({ 
+      path: '/login',
+      query: { 
+        redirect: to.fullPath,
+        showLogin: 'true'
+      }
+    });
+    return;
   }
 
   // 其他情况正常放行
