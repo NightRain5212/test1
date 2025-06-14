@@ -26,4 +26,13 @@ FASTAPI_CONFIG = {
 UPLOAD_CONFIG = {
     "max_file_size": 1024 * 1024 * 100,  # 100MB
     "allowed_extensions": [".mp4", ".avi", ".mov", ".wav", ".mp3", ".webm"]
+}
+
+# 讯飞星火大模型配置
+SPARK_CONFIG = {
+    "app_id": os.getenv("SPARK_APP_ID", ""),
+    "api_key": os.getenv("SPARK_API_KEY", ""),
+    "api_secret": os.getenv("SPARK_API_SECRET", ""),
+    "spark_url": "wss://spark-api.xf-yun.com/v3.1/chat",  # v3.1版本的API地址
+    "domain": "generalv3",  # 使用V3版本的通用大模型
 } 
