@@ -1,9 +1,9 @@
 <template>
     <!-- 头像展示（点击触发文件选择） -->
     <n-avatar round :size="72" :src="avatarUrl" class="user-avatar" @click="triggerFileInput">
-        <template #default v-if="!avatarUrl">
+        <!-- <template #default v-if="!avatarUrl">
             <UserOutlined style="font-size: 72px;" />
-        </template>
+        </template> -->
     </n-avatar>
 
     <input ref="fileInput" type="file" accept="image/*" style="display: none" @change="handleFileSelect" />
@@ -29,9 +29,12 @@ import {UserOutlined} from '@ant-design/icons-vue';
 import { message } from 'ant-design-vue'
 import {NAvatar,NButton,NModal,NCard,NSpace} from 'naive-ui'
 import Cropper from 'cropperjs';
+import { useStore } from '../store';
+const store = useStore();
 const fileInput = ref(null);
 const cropperImage = ref(null);
 const avatarUrl = ref('');
+//const avatarUrl=store.getUser().avatarSrc;
 const showCropModal = ref(false);
 let cropper = null;
 
@@ -56,7 +59,7 @@ const handleFileSelect = (e) =>{
 }
 
 // 初始化裁剪器
- const initCropper =async (imageSrc) => {
+const initCropper = async (imageSrc) => {
   try {
     // 确保目标元素存在且已挂载
     await nextTick();
@@ -71,16 +74,15 @@ const handleFileSelect = (e) =>{
 
     // 初始化新实例
     cropper = new Cropper(cropperImage.value, {
-      aspectRatio: 1,
-      viewMode: 1,
-      autoCropArea: 1,
+      aspectRatio: 1,      // 裁剪框宽高比为1:1（正方形）
+      viewMode: 1,         // 限制裁剪框不超过画布边界
+      autoCropArea: 1,     // 初始裁剪区域占满整个图片
       ready() {
-        console.log('Cropper ready');
+        console.log('Cropper ready'); // 初始化完成回调
+        cropper.replace(imageSrc);// 设置图片源（必须在初始化后）
       }
     });
 
-    // 设置图片源（必须在初始化后）
-    cropper.replace(imageSrc);
   } catch (err) {
     console.error('Cropper init failed:', err);
     message.error('图片加载失败');
@@ -107,16 +109,29 @@ const confirmCrop = () => {
     avatarUrl.value = canvas.toDataURL('image/png');
     showCropModal.value = false;
 
+    console.log("上传头像:");
     // 上传逻辑
     canvas.toBlob(async (blob) => {
       const formData = new FormData();
-      formData.append('avatar', blob, 'avatar.png');
-      // 调用上传API
+      formData.append('image', blob, 'avatar.png');  // 关键修改：字段名必须是"image"
+
+      try {
+        const res = await axios.post('/upload', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'  // 必须设置这个请求头
+          }
+        });
+        console.log('上传成功', res.data);
+        store.state.userinfo.avatarUrl = res.data?.image_url?? '';
+        avatarUrl = res.data?.image_url?? '';
+        console.log('avatarUrl',store.state.userinfo.avatarUrl)
+        a
+      } catch (error) {
+        console.error('上传失败:', error);
+      }
     }, 'image/png', 0.9);
-    
   } catch (err) {
     console.error('Crop failed:', err);
-    message.error('裁剪失败: ' + err.message);
   }
 };
 

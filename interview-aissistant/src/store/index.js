@@ -35,6 +35,7 @@ export const useStore = defineStore('auth', {
 
       this.userInfo.avatarSrc = userInfo.preference?.avatarSrc??'';
       this.userInfo.bio = userInfo.preference?.bio??'';
+
     },
     // 文件操作方法
     saveFiles(files) {

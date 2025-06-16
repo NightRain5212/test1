@@ -308,7 +308,7 @@ async def get_info(username: str):
     #查询用户存储信息
     user_store = db_manager.select(
         table="user_store",
-        conditions={"user_id": user["id"]}
+        conditions={"user_id": user[0]["id"]}
     )
     
     try:
