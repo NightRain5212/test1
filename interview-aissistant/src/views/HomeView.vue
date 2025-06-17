@@ -1,14 +1,23 @@
 <template>
   <!-- 用于显示模态框的时候判断鼠标点击是否有效 -->
-  <div class="home" :style="{ 'pointer-events': isModalOpen ? 'none' : 'auto' }">
+  <div class="home" :style="{ 'pointer-events': isModalOpen||isbegin ? 'none' : 'auto' }">
+
     <div class="viewarea">
-      <!-- 摄像头视频显示区域 -->
-      <video ref="cameraVideo" autoplay muted class="camera" v-show="isCameraActive"></video>
-      <div v-show="!isCameraActive" class="placeholder">摄像头未开启</div>
+      <video ref="cameraVideo" autoplay muted class="camera-pip" v-show="isCameraActive"
+        disablePictureInPicture></video>
+      <!-- <div v-show="!isCameraActive" class="placeholder">摄像头未开启</div>-->
+      <img src="../assets/preview1.png" alt="马到成功" width=100% height=100% />
     </div>
+
     <div class="controlarea">
+      <button @click="toggleisbegin" class="btn1">
+        开始面试
+      </button>
       <button @click="toggleCamera" class="btn1">
         {{ isCameraActive ? '关闭摄像头' : '开启摄像头' }}
+      </button>
+      <button class="btn1">
+        设置场景
       </button>
       <button @click="toggleRecording" class="btn1" v-if="isCameraActive" :class="{ 'recording': isRecording }">
         {{ isRecording ? '停止录制' : '开始录制' }}
@@ -39,23 +48,46 @@
         <a-slider v-model:value="sliderValue" :min="0" :max="100" class="slider" />
       </div>
     </div>
-      <Teleport to="#modal-root">
-    <!-- 内容区域启用指针事件 -->
-    <div v-if="isModalOpen" class="modal-mask" style="pointer-events: auto;" @click.stop>
-      <div class="modal-header">
-        <h3>提示</h3>
+    <Teleport to="#modal-root">
+      <n-card class="startInterview" v-if="isbegin">
+
+        简历
+        <div class="card-content">
+          岗位
+          <n-radio-group v-model:value="cardValue" name="radiogroup">
+            <n-space>
+              <n-radio v-for="song in songs1" :key="song.value" :value="song.value">
+                {{ song.label }}
+              </n-radio>
+            </n-space>
+          </n-radio-group>
+
+        </div>
+
+        <template #action>
+          <div class="card-action">
+            <button @click="startstart" class="btn confirm">正式开始</button>
+            <button @click="isbegin = !isbegin" class="btn cancle">我再想想</button>
+          </div>
+        </template>
+      </n-card>
+
+      <!-- 内容区域启用指针事件 -->
+      <div v-if="isModalOpen" class="modal-mask" style="pointer-events: auto;" @click.stop>
+        <div class="modal-header">
+          <h3>提示</h3>
+        </div>
+        <div class="modal-content">
+          <p>{{ currentModal.message }}</p>
+        </div>
+        <div class="modal-footer">
+          <button @click="handleConfirm" class="btn confirm">是</button>
+          <button @click="handleCancel" class="btn cancle">否</button>
+        </div>
       </div>
-      <div class="modal-content">
-        <p>{{ currentModal.message }}</p>
-      </div>
-      <div class="modal-footer">
-        <button @click="handleConfirm" class="btn confirm">是</button>
-        <button @click="handleCancel" class="btn cancle">否</button>
-      </div>
-    </div>
-  </Teleport>
+    </Teleport>
   </div>
- 
+
 </template>
 <script setup>
 import { message } from 'ant-design-vue'
@@ -82,7 +114,88 @@ let gainNode = null// 浏览器内置的音频处理节点
 let microphone = null// 用于连接麦克风
 
 const router = useRouter()
+//开始面试相关
+const isbegin=ref(false);
+async function toggleisbegin(){
+  isbegin.value=!isbegin.value;
+  if(isbegin.value==false){
+    stopCamera();
+  }else{
+    if(!isCameraActive){
+      await startCamera()
+    }
+  }
+}
 
+function startstart(){
+  console.log('kkk');
+}
+
+const cardValue = ref(null) // 默认未选择
+
+// card数据
+const songs1 = [
+  {
+    value: "前端",
+    label: "前端"
+  },
+  {
+    value: "后端",
+    label: "后端",
+  },
+  {
+    value: "全栈",
+    label: "全栈",
+  },
+  {
+    value: "移动端开发",
+    label: "移动端开发",
+  },
+  {
+    value: "算法工程师",
+    label: "算法工程师"
+  },
+  {
+    value: "软件测试",
+    label: "软件测试"
+  },
+  {
+    value: "数据科学",
+    label: "数据科学"
+  },
+  {
+    value: "UI设计",
+    label: "UI设计"
+  },
+  {
+    value: "UX设计",
+    label: "UX设计"
+  },
+  {
+    value: "运营",
+    label: "运营"
+  },
+  {
+    value: "游戏开发",
+    label: "游戏开发"
+  },
+  {
+    value: "云计算",
+    label: "云计算"
+  },
+  {
+    value: "区块链",
+    label: "区块链"
+  },
+  {
+    value: "AR/VR",
+    label: "AR/VR"
+  },
+  {
+    value: "敬请期待",
+    label: "敬请期待"
+  }
+];
 //声音相关
 // 监听滑块值变化
 watch(sliderValue, (newVal) => {
@@ -360,24 +473,54 @@ const handleCancel = () => {
   justify-content: center;
   align-items: center;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
+    border-radius: 8px;
   
-.camera {
-  width: 80%;
-  height: auto; /* 高度自适应 */
-  aspect-ratio: 16/9; /* 固定宽高比（常用摄像头比例） */
-  object-fit: contain; /* 改为contain以完整显示画面 */
-  background: #000;
-  transform: scaleX(-1);
-  margin: 0 auto; /* 水平居中 */
-}
+    .camera {
+      width: 80%;
+      height: auto;
+      /* 高度自适应 */
+      aspect-ratio: 16/9;
+      /* 固定宽高比（常用摄像头比例） */
+      object-fit: contain;
+      /* 改为contain以完整显示画面 */
+      background: #000;
+      transform: scaleX(-1);
+      margin: 0 auto;
+      /* 水平居中 */
+    }
   
-  .placeholder {
-    color: #666;
-    font-size: 1.2rem;
+    .camera-pip {
+      position: fixed;
+      /* 固定定位 */
+      right: 10px;
+      /* 距离右侧距离 */
+      bottom: 10px;
+      /* 距离底部距离 */
+      width: 200px;
+      /* 小窗宽度 */
+      height: auto;
+      /* 高度自适应 */
+      border: 2px solid #fff;
+      /* 可选边框 */
+      border-radius: 8px;
+      /* 圆角 */
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+      /* 阴影增强悬浮感 */
+      z-index: 1000;
+      /* 确保悬浮在最上层 */
+      background-color: #000;
+  
+      :hover {
+        transform: scale(1.05);
+        transition: transform 0.2s;
+      }
+    }
+  
+    .placeholder {
+      color: #666;
+      font-size: 1.2rem;
+    }
   }
-}
-
 .controlarea {
   background: #fff;
   height: 100%;
@@ -554,4 +697,69 @@ const handleCancel = () => {
   border-radius: 4px;
   margin: 8px 0;
 }
+.startInterview{
+  position: fixed; /* 改为fixed以覆盖全屏 */
+  top: 50%;       /* 先定位到视口中心 */
+  left: 50%;
+  transform: translate(-50%, -50%);
+    /* 双方向偏移自身50% */
+    width: 500px;
+    height: 300px;
+    z-index: 1000;
+    /* 确保在最上层 */
+    background: white;
+    /* 避免透明 */
+    border-radius: 8px;
+    /* 可选圆角 */
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+    /* 增强模态框效果 */
+  
+    .card-content {
+      padding: 5px 5px;
+    }
+  
+    .card-action {
+      padding: 12px 16px;
+      background: #f5f5f5;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      border-top: 1px solid #e8e8e8;
+  
+      .btn {
+        min-width: 80px;
+        height: 32px;
+        font-size: 14px;
+        padding: 0 15px;
+        border-radius: 4px;
+        transition: background-color 0.3s ease;
+  
+        &.confirm {
+          background: #28a745;
+          color: white;
+  
+          &:hover {
+            background: #218838;
+          }
+  
+          &:active {
+            background: #d1d4d6;
+          }
+        }
+  
+        &.cancle {
+          background: #dc3545;
+          color: white;
+  
+          &:hover {
+            background: #c82333;
+          }
+  
+          &:active {
+            background: #d1d4d6;
+          }
+        }
+      }
+    }
+  }
 </style>

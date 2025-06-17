@@ -11,13 +11,14 @@ export const useStore = defineStore('auth', {
       avatarSrc: '',// 用户头像的URL
       bio: '', // 用户简介''
     },
-    //存储实际文件数据
-    userFiles: {
-      images: [],    // 图片文件
-      audios: [],     // 音频文件
-      videos: [],     // 视频文件
-      documents: []   // 其他文档
-    }
+    //用于临时存储，防止数据丢失
+    userTempFiles: {
+      images: [] ,   // 图片文件，如图表，用户头像等，格式:{name:'',data:''}
+      audios: [] ,   // 当前正在进行的音频文件,格式:{name:'',data:''}
+      videos: [] ,    // 当前正在进行的视频文件格式:{name:'',data:''}
+      documents: []  // 报告,格式:{name:'',data:''}
+    },
+    userHistory:[]//一个列表,每项包括评分、资源的url地址等。
   }),
   actions: {
     login() {
@@ -35,7 +36,6 @@ export const useStore = defineStore('auth', {
 
       this.userInfo.avatarSrc = userInfo.preference?.avatarSrc??'';
       this.userInfo.bio = userInfo.preference?.bio??'';
-
     },
     // 文件操作方法
     saveFiles(files) {
