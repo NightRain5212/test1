@@ -7,7 +7,7 @@ import Login from '../views/Login.vue'  // 直接导入Login组件
 
 const routes = [
   {
-    path: '/',
+    path: '/home',
     name: 'home',
     component: HomeView,
     meta: { requiresAuth: true }
@@ -18,16 +18,17 @@ const routes = [
     component: ReportView,
     meta: { requiresAuth: true }
   },
-  {
-    path: '/myProfile',
-    name: 'profile',
-    component: MyProfile,
-    meta: { requiresAuth: true }
-  },
+
   {
     path: '/history',
     name: 'history',
     component: HistoryView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/community',
+    name: 'community',//命名，home就可以代指url路径了
+    component: () => import('../views/Community.vue'),
     meta: { requiresAuth: true }
   },
   {
@@ -41,6 +42,18 @@ const routes = [
     name: 'settingsView',//命名，home就可以代指url路径了
     component: () => import('../views/SettingsView.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/myProfile',
+    name: 'profile',
+    component: MyProfile,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/about',
+    name: 'about',//命名，home就可以代指url路径了
+    component: () => import('../views/About.vue'),
+    meta: { requiresAuth: false }
   }
 ]
 
