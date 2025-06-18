@@ -6,25 +6,32 @@ import shutil
 from pathlib import Path
 import uuid
 import json
+
 # 添加项目根目录到Python路径
 current_dir = Path(__file__).parent
 sys.path.append(str(current_dir))
 
-from fastapi import FastAPI, HTTPException, Request, status, UploadFile, File
+from fastapi import FastAPI, HTTPException, Request, status, UploadFile, File, Form, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel,Field#Field用于设置字段的属性，如必填、默认值等
-from datetime import datetime, timedelta #timedelta类可以参与datatime的加减
-from typing import Optional,Dict,Any,List
+from pydantic import BaseModel, Field
+from datetime import datetime, timedelta
+from typing import Optional, Dict, Any, List
+from fastapi.security import OAuth2PasswordBearer
+from passlib.context import CryptContext
+import secrets
+from jose import jwt
 
-from passlib.context import CryptContext #用于密码哈希和验证
-import secrets  #用于生成安全的随机令牌
-from jose import jwt #jwt相关
-
-from analyzer import main as analyzer #导入模块
-from  FileManager import FileManager
+from analyzer.main import InterviewAnalyzer
 from database import DatabaseManager
+from FileManager import FileManager
+from config import (
+    UPLOAD_DIR, ALLOWED_EXTENSIONS, SECRET_KEY as CONFIG_SECRET_KEY,
+    ALGORITHM as CONFIG_ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES as CONFIG_TOKEN_EXPIRE,
+    SPARK_CONFIG
+)
+from spark_client import SparkClient
 
 # 创建实例化对象
 print(">>>>>>>>>>>>>>>>>>>>>加载对象实例<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
@@ -39,20 +46,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# OAuth2 配置
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")  # 用于密码哈希和验证
 # 配置JWT
 load_dotenv(".env")
 load_dotenv(".env.secret")#叠加加载
 print(">>>>>>>>>>>>>>>>>>>>>加载环境变量<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-SECRET_KEY = os.getenv("SECRET_KEY")
-ALGORITHM = os.getenv("ALGORITHM")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
+SECRET_KEY = os.getenv("SECRET_KEY") or CONFIG_SECRET_KEY
+ALGORITHM = os.getenv("ALGORITHM") or CONFIG_ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES") or CONFIG_TOKEN_EXPIRE)
 REFRESH_TOKEN_EXPIRE_MINUTES =int(os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES"))
 OSS_ACCESS_KEY_ID = os.getenv("OSS_ACCESS_KEY_ID")
 OSS_ACCESS_KEY_SECRET = os.getenv("OSS_ACCESS_KEY_SECRET")
 
-db_manager = DatabaseManager()
+# 创建全局对象实例
+print(">>>>>>>>>>>>>>>>>>>>>加载对象实例<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+analyzer = InterviewAnalyzer()
 file_manager = FileManager(OSS_ACCESS_KEY_ID,OSS_ACCESS_KEY_SECRET,"interviewresource","https://cn.aliyun.com/")
+db_manager = DatabaseManager()
 
 #analyzer.run("demo-video.mp4")#测试
 #analyzer.run()#测试
@@ -60,29 +73,43 @@ file_manager = FileManager(OSS_ACCESS_KEY_ID,OSS_ACCESS_KEY_SECRET,"interviewres
 # 定义 Pydantic 模型
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
+
 class RegisterRequest(BaseModel):
     username: str
     email: str =None
     password: str
+
 class UserInfoRequest(BaseModel):
     id: int
     username: str
+
 class HistoryRecord(BaseModel):
     id: int
     user_id: int
     action: str
     timestamp: datetime
+
 class UploadRequest(BaseModel):
     video: Optional[UploadFile] = File(None)
     audio: Optional[UploadFile] = File(None)
     image: Optional[UploadFile] = File(None)
+
 class UpdataRequest(BaseModel):
     id: int
     username: str=""
     email: str=""
     preferences: Dict[str, Any] = {} #user_store中直接存储json
+
 class DownLoadRequest(BaseModel):
     urls: List[str] = Field(..., max_items=10, description="要下载的文件URL列表，最多10个")
+
+class NextQuestionRequest(BaseModel):
+    resume_path: str
+
+class AnalyzeRequest(BaseModel):
+    video_path: str
+    resume_path: str
+
 # 传入刷新令牌，获取新的访问令牌access_token和刷新令牌refresh_token
 @app.post("/api/auth/refresh")
 async def refresh_token(request: RefreshTokenRequest,meta:Request):
@@ -504,16 +531,181 @@ async def download(request: DownLoadRequest):
             import shutil
             shutil.rmtree(temp_dir, ignore_errors=True)
 
-# 如果通过命令fastapi dev main.py，则不会执行下面的代码
+# 创建上传目录
+RESUME_DIR = Path(UPLOAD_DIR) / "resumes"
+RESUME_DIR.mkdir(parents=True, exist_ok=True)
+
+# 简历允许的文件类型
+RESUME_ALLOWED_EXTENSIONS = {'txt', 'doc', 'docx', 'pdf', 'jpg', 'jpeg', 'png'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in RESUME_ALLOWED_EXTENSIONS
+
+@app.post("/api/resume/upload")
+async def upload_resume(
+    file: UploadFile = File(...),
+    job_type: str = Form(...)
+):
+    """
+    上传简历并生成面试问题
+    """
+    print(f"接收到文件上传请求: filename={file.filename}, content_type={file.content_type}, job_type={job_type}")
+    
+    if not file:
+        raise HTTPException(status_code=400, detail="没有上传文件")
+    
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="文件名不能为空")
+    
+    if not allowed_file(file.filename):
+        print(f"不支持的文件类型: {file.filename}")
+        raise HTTPException(
+            status_code=422, 
+            detail=f"不支持的文件类型: {file.filename}，仅支持txt、doc、docx、pdf、jpg、jpeg、png格式"
+        )
+    
+    try:
+        # 生成唯一的文件名
+        file_extension = file.filename.rsplit('.', 1)[1].lower()
+        unique_filename = f"{uuid.uuid4().hex}.{file_extension}"
+        file_path = RESUME_DIR / unique_filename
+        
+        # 保存文件
+        print(f"保存文件到: {file_path}")
+        with file_path.open("wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # TODO: 如果是PDF或图片，需要进行OCR处理
+        # 这里暂时假设是文本文件
+        try:
+            resume_text = file_path.read_text(encoding='utf-8')
+            print("成功读取文件内容")
+        except UnicodeDecodeError:
+            print("非文本文件，跳过内容读取")
+            # 如果不是文本文件，返回文件路径供后续处理
+            resume_text = ""
+        
+        # 生成面试问题
+        analyzer = InterviewAnalyzer()
+        questions = await analyzer.process_resume(resume_text, job_type)
+        
+        return {
+            "code": 200,
+            "data": {
+                "questions": questions,
+                "resume_path": str(file_path)
+            }
+        }
+    except Exception as e:
+        print(f"文件上传处理错误: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"简历上传失败：{str(e)}")
+
+@app.post("/api/interview/next_question")
+async def get_next_question(request: NextQuestionRequest):
+    """
+    获取下一个面试问题
+    """
+    try:
+        analyzer = InterviewAnalyzer()
+        with open(request.resume_path, 'r', encoding='utf-8') as f:
+            resume_text = f.read()
+        
+        analyzer.resume_text = resume_text
+        question = analyzer.get_next_question()
+        
+        if not question:
+            return {
+                "code": 200,
+                "data": {
+                    "completed": True,
+                    "question": None
+                }
+            }
+        
+        return {
+            "code": 200,
+            "data": {
+                "completed": False,
+                "question": question
+            }
+        }
+    except Exception as e:
+        print(f"获取下一个问题失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取下一个问题失败：{str(e)}")
+
+@app.post("/api/analyze")
+async def analyze_interview(
+    video: Optional[UploadFile] = File(None),
+    audio: Optional[UploadFile] = File(None),
+    text: Optional[str] = Form(None)
+):
+    """
+    分析面试表现
+    :param video: 视频文件
+    :param audio: 音频文件
+    :param text: 文本内容
+    :return: 分析结果
+    """
+    try:
+        # 保存上传的文件
+        video_path = None
+        audio_path = None
+        
+        if video:
+            video_path = await save_upload_file(video, "video")
+        if audio:
+            audio_path = await save_upload_file(audio, "audio")
+            
+        # 运行分析
+        result = await analyzer.run(
+            video_path=video_path,
+            audio_path=audio_path,
+            text=text
+        )
+        
+        return result
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"分析过程出错: {str(e)}"
+        )
+
+@app.post("/api/video/upload")
+async def upload_video(file: UploadFile = File(...)):
+    """上传视频"""
+    try:
+        # 检查文件类型
+        if not file_manager.allowed_file(file.filename):
+            raise HTTPException(status_code=400, detail="不支持的文件类型")
+        
+        # 保存文件
+        file_path = await file_manager.save_file(file, "video")
+        
+        # 返回结果
+        return {
+            "success": True,
+            "data": {
+                "file_path": file_path
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"视频上传失败：{str(e)}")
+
+def main():
+    """主函数"""
+    try:
+        # 创建分析器实例
+        analyzer = InterviewAnalyzer()
+        
+        # 这里添加你的主要逻辑
+        print("面试分析系统已启动")
+        
+    except Exception as e:
+        print(f"系统启动失败: {str(e)}")
+        sys.exit(1)
+
 if __name__ == "__main__":
-    # 使用 FastAPI CLI 启动应用
-    subprocess.run([
-        sys.executable,  # 当前 Python 解释器路径
-        "-m", 
-        "fastapi", 
-        "dev", 
-        "main.py",
-        "--host", "0.0.0.0",
-        "--port", os.getenv("PORT", "8000")
-    ])
+    main()
 

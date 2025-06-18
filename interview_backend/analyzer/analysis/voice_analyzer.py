@@ -3,6 +3,11 @@ import numpy as np
 from pyAudioAnalysis import audioBasicIO as aIO
 from pyAudioAnalysis import ShortTermFeatures as sF
 import os
+from pathlib import Path
+import subprocess
+from datetime import datetime
+from config import AUDIO_DIR
+import asyncio
 
 class VoiceAnalyzer:
     def __init__(self, model_size="base"):
@@ -17,6 +22,171 @@ class VoiceAnalyzer:
             print(f"加载Whisper模型失败: {str(e)}")
             self.model = None
             
+    async def analyze(self, video_path):
+        """分析视频中的语音"""
+        try:
+            # 提取音频
+            audio_path = await self._extract_audio(video_path)
+            
+            # 语音识别
+            text = await self._transcribe_audio(audio_path)
+            
+            # 分析语音特征
+            features = await self._analyze_features(audio_path)
+            
+            # 计算总分
+            total = (
+                features["speech_rate"] * 0.2 +
+                features["pitch_variation"] * 0.3 +
+                features["energy_variation"] * 0.2 +
+                features["energy_mean"] * 0.3
+            )
+            
+            return {
+                "total": float(total),
+                "details": features,
+                "text": text
+            }
+            
+        except Exception as e:
+            print(f"语音分析错误: {str(e)}")
+            return {
+                "total": 0.0,
+                "details": {
+                    "speech_rate": 0.0,
+                    "pitch_variation": 0.0,
+                    "energy_variation": 0.0,
+                    "energy_mean": 0.0
+                },
+                "text": ""
+            }
+    
+    async def _extract_audio(self, video_path):
+        """从视频中提取音频"""
+        # 确保音频目录存在
+        audio_dir = Path(AUDIO_DIR)
+        audio_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 生成唯一的音频文件名
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        audio_filename = f"audio_{timestamp}.wav"
+        audio_path = audio_dir / audio_filename
+        
+        try:
+            # 使用 ffmpeg 提取音频
+            process = await asyncio.create_subprocess_exec(
+                'ffmpeg',
+                '-i', str(video_path),
+                '-vn',  # 不处理视频
+                '-acodec', 'pcm_s16le',  # 音频编码
+                '-ar', '44100',  # 采样率
+                '-ac', '2',  # 声道数
+                '-y',  # 覆盖已存在的文件
+                str(audio_path),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            stdout, stderr = await process.communicate()
+            
+            if process.returncode != 0:
+                raise ValueError(f"音频提取失败: {stderr.decode()}")
+            
+            return str(audio_path)
+            
+        except Exception as e:
+            print(f"音频提取错误: {str(e)}")
+            raise
+    
+    async def _transcribe_audio(self, audio_path):
+        """转录音频为文本"""
+        try:
+            # 使用 whisper 进行语音识别
+            result = await asyncio.to_thread(
+                self.model.transcribe,
+                audio_path,
+                language="zh"
+            )
+            
+            return result["text"]
+            
+        except Exception as e:
+            print(f"语音识别错误: {str(e)}")
+            return ""
+    
+    async def _analyze_features(self, audio_path):
+        """分析语音特征"""
+        try:
+            # 使用 ffmpeg 提取音频特征
+            process = await asyncio.create_subprocess_exec(
+                'ffmpeg',
+                '-i', str(audio_path),
+                '-af', 'astats=metadata=1:reset=1',
+                '-f', 'null',
+                '-',
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            stdout, stderr = await process.communicate()
+            
+            if process.returncode != 0:
+                raise ValueError(f"音频特征提取失败: {stderr.decode()}")
+            
+            # 解析音频特征
+            features = self._parse_audio_features(stderr.decode())
+            
+            return features
+            
+        except Exception as e:
+            print(f"音频特征分析错误: {str(e)}")
+            return {
+                "speech_rate": 0.0,
+                "pitch_variation": 0.0,
+                "energy_variation": 0.0,
+                "energy_mean": 0.0
+            }
+    
+    def _parse_audio_features(self, ffmpeg_output):
+        """解析 ffmpeg 输出的音频特征"""
+        try:
+            # 提取音频特征
+            lines = ffmpeg_output.split('\n')
+            features = {}
+            
+            for line in lines:
+                if "RMS level dB" in line:
+                    features["energy_mean"] = float(line.split(':')[1].strip())
+                elif "Peak level dB" in line:
+                    features["energy_variation"] = float(line.split(':')[1].strip())
+                elif "Flatness" in line:
+                    features["pitch_variation"] = float(line.split(':')[1].strip())
+                elif "Duration" in line:
+                    duration = float(line.split(':')[1].strip().split(' ')[0])
+                    features["speech_rate"] = 1.0 / duration if duration > 0 else 0.0
+            
+            # 归一化特征值
+            for key in features:
+                if key == "energy_mean":
+                    features[key] = (features[key] + 60) / 60  # 归一化到 0-1
+                elif key == "energy_variation":
+                    features[key] = (features[key] + 60) / 60  # 归一化到 0-1
+                elif key == "pitch_variation":
+                    features[key] = min(features[key], 1.0)  # 限制在 0-1
+                elif key == "speech_rate":
+                    features[key] = min(features[key], 1.0)  # 限制在 0-1
+            
+            return features
+            
+        except Exception as e:
+            print(f"音频特征解析错误: {str(e)}")
+            return {
+                "speech_rate": 0.0,
+                "pitch_variation": 0.0,
+                "energy_variation": 0.0,
+                "energy_mean": 0.0
+            }
+    
     def analyze_audio(self, audio_path):
         """分析音频文件，返回语音特征和文本"""
         try:

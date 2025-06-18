@@ -1,4 +1,4 @@
-# analyzer 包的初始化文件
+"""面试分析模块"""
 from .main import InterviewAnalyzer
 
 __all__ = ['InterviewAnalyzer'] 

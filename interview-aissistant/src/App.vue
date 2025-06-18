@@ -77,14 +77,14 @@ const handleMenuSelect = ({ key }) => {
 };
 
 // 侧边栏拖动逻辑
-const sidebarWidth = ref(70); // 初始宽度
+const sidebarWidth = ref(200); // 修改初始宽度为200px
 const minWidth = 70; // 最小宽度(只显示图标)
 const maxWidth = 200; // 最大宽度
 const isDragging = ref(false);
 const startX = ref(0);
 const startWidth = ref(0);
 const sidebar = ref(null);
-const collapsed = ref(true);
+const collapsed = ref(false); // 修改初始状态为展开
 
 const startDrag = (e) => {
   isDragging.value = true;
@@ -146,6 +146,8 @@ onUnmounted(() => {
   transition: width 0.2s;
   flex-shrink: 0;//防止收缩
   overflow: hidden;//溢出隐藏
+  background-color: #001529; // 添加深色背景
+  z-index: 1000; // 确保侧边栏在最上层
 }
 
 .drag-handle {
