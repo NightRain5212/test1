@@ -1,6 +1,6 @@
 <template>
   <!-- 用于显示模态框的时候判断鼠标点击是否有效 -->
-  <div class="home" :style="{ 'pointer-events': isModalOpen||isbegin ? 'none' : 'auto' }">
+  <div class="home" :style="{ 'pointer-events': isModalOpen||show_card ? 'none' : 'auto' }">
 
     <div class="viewarea">
       <video ref="cameraVideo" autoplay muted class="camera-pip" v-show="isCameraActive"
@@ -10,7 +10,7 @@
     </div>
 
     <div class="controlarea">
-      <button @click="toggleisbegin" class="btn1">
+      <button v-if="!show_start" @click="show_card=true" class="btn1">
         开始面试
       </button>
       <button @click="toggleCamera" class="btn1">
@@ -48,29 +48,64 @@
         <a-slider v-model:value="sliderValue" :min="0" :max="100" class="slider" />
       </div>
     </div>
+    
     <Teleport to="#modal-root">
-      <n-card class="startInterview" v-if="isbegin">
+      <n-card class="card" v-if="show_card">
+    <div v-if="currentStep === 0" class="card1">
+     简历
+      <div class="cardButtons">
+        <n-button type="error" ghost @click="closeCard">我再想想</n-button>
+        <n-button type="primary" @click="currentStep = 1">下一步</n-button>
+      </div>
+    </div>
 
-        简历
-        <div class="card-content">
-          岗位
-          <n-radio-group v-model:value="cardValue" name="radiogroup">
-            <n-space>
-              <n-radio v-for="song in songs1" :key="song.value" :value="song.value">
-                {{ song.label }}
+    <div v-else class="card2">
+      <!-- 第一级选择 -->
+      <n-radio-group v-model:value="primarySelection" name="primaryGroup">
+        <n-space vertical>
+          <n-radio
+            v-for="item in primaryOptions"
+            :key="item.value"
+            :value="item.value"
+            class="card-select"
+          >
+            {{ item.label }}
+          </n-radio>
+        </n-space>
+      </n-radio-group>
+
+      <!-- 第二级选择 -->
+      <div class="secondary-selection" v-if="primarySelection">
+        <n-divider />
+        <n-radio-group v-model:value="secondarySelection" name="secondaryGroup">
+          <n-grid :cols="3" :x-gap="12">
+            <n-gi
+              v-for="item in getSecondaryOptions()"
+              :key="item.value"
+            >
+              <n-radio
+                :value="item.value"
+                class="card-select2"
+              >
+                {{ item.label }}
               </n-radio>
-            </n-space>
-          </n-radio-group>
+            </n-gi>
+          </n-grid>
+        </n-radio-group>
+      </div>
 
-        </div>
-
-        <template #action>
-          <div class="card-action">
-            <button @click="startstart" class="btn confirm">正式开始</button>
-            <button @click="isbegin = !isbegin" class="btn cancle">我再想想</button>
-          </div>
-        </template>
-      </n-card>
+      <div class="cardButtons">
+        <n-button type="error" ghost @click="currentStep = 0">上一步</n-button>
+        <n-button 
+          type="primary" 
+          :disabled="!secondarySelection"
+          @click="toggleStart"
+        >
+          开始
+        </n-button>
+      </div>
+    </div>
+  </n-card>
 
       <!-- 内容区域启用指针事件 -->
       <div v-if="isModalOpen" class="modal-mask" style="pointer-events: auto;" @click.stop>
@@ -90,10 +125,11 @@
 
 </template>
 <script setup>
-import { message } from 'ant-design-vue'
+import { BadgeRibbon, message } from 'ant-design-vue'
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 // import{addModal,Notice} from '../components/Notice/index.js';
+import { NCard, NRadio, NRadioGroup, NSpace, NButton, NDivider, NGrid, NGi } from 'naive-ui'
 //摄像相关
 const isCameraActive = ref(false)
 const cameraVideo = ref(null)
@@ -108,6 +144,7 @@ const recordingDuration = ref('00:00')
 let recordingTimer = null
 const islatest_save = ref(false);//最新的录像是否保存
 
+
 let cameraStream = null
 let audioContext = null
 let gainNode = null// 浏览器内置的音频处理节点
@@ -115,87 +152,67 @@ let microphone = null// 用于连接麦克风
 
 const router = useRouter()
 //开始面试相关
-const isbegin=ref(false);
-async function toggleisbegin(){
-  isbegin.value=!isbegin.value;
-  if(isbegin.value==false){
-    stopCamera();
-  }else{
-    if(!isCameraActive){
-      await startCamera()
-    }
+const show_card = ref(false);
+const show_start = ref(false);
+async function toggleStart() {
+  if (!isCameraActive.value){
+    console.log('请打开摄像头');
+    await startCamera();
   }
+  if(!isRecording.value){
+    console.log('请开始录音');
+    await startRecording();
+  }
+  console.log('开始面试');
+  closeCard();
 }
 
-function startstart(){
-  console.log('kkk');
+const currentStep = ref(0)
+const primarySelection = ref('')
+const secondarySelection = ref('')
+
+const primaryOptions = [
+  { value: 'development', label: '开发岗' },
+  { value: 'research', label: '研发岗' },
+  { value: 'technical', label: '技术岗' },
+  { value: 'testing', label: '测试岗' }
+]
+
+const secondaryOptions = {
+  development: [
+    { value: 'frontend', label: '前端开发' },
+    { value: 'backend', label: '后端开发' },
+    { value: 'fullstack', label: '全栈开发' },
+    { value: 'embedded', label: '嵌入式开发' },
+    { value: 'desktop', label: 'C++桌面开发' },
+    { value: 'mobile', label: '移动端开发' },
+    { value: 'game', label: '游戏开发' }
+  ],
+  research: [
+    { value: 'system-arch', label: '计算机系统结构' }
+  ],
+  technical: [
+    { value: 'algorithm', label: '算法工程师' },
+    { value: 'data-analysis', label: '数据分析' },
+    { value: 'data-mining', label: '数据挖掘' }
+  ],
+  testing: [
+    { value: 'qa', label: '软件测试工程师' },
+  ]
 }
 
-const cardValue = ref(null) // 默认未选择
+const getPrimaryLabel = () => {
+  return primaryOptions.find(item => item.value === primarySelection.value)?.label || ''
+}
 
-// card数据
-const songs1 = [
-  {
-    value: "前端",
-    label: "前端"
-  },
-  {
-    value: "后端",
-    label: "后端",
-  },
-  {
-    value: "全栈",
-    label: "全栈",
-  },
-  {
-    value: "移动端开发",
-    label: "移动端开发",
-  },
-  {
-    value: "算法工程师",
-    label: "算法工程师"
-  },
-  {
-    value: "软件测试",
-    label: "软件测试"
-  },
-  {
-    value: "数据科学",
-    label: "数据科学"
-  },
-  {
-    value: "UI设计",
-    label: "UI设计"
-  },
-  {
-    value: "UX设计",
-    label: "UX设计"
-  },
-  {
-    value: "运营",
-    label: "运营"
-  },
-  {
-    value: "游戏开发",
-    label: "游戏开发"
-  },
-  {
-    value: "云计算",
-    label: "云计算"
-  },
-  {
-    value: "区块链",
-    label: "区块链"
-  },
-  {
-    value: "AR/VR",
-    label: "AR/VR"
-  },
-  {
-    value: "敬请期待",
-    label: "敬请期待"
-  }
-];
+const getSecondaryOptions = () => {
+  return secondaryOptions[primarySelection.value] || []
+}
+
+const closeCard = () => {
+  show_card.value = false
+}
+
 //声音相关
 // 监听滑块值变化
 watch(sliderValue, (newVal) => {
@@ -762,4 +779,67 @@ const handleCancel = () => {
       }
     }
   }
+
+.card {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 500px;
+  max-width: 90vw;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+
+  .card1 {
+    height: 200px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+
+    .card-select {
+      display: block;
+      padding: 12px 16px;
+      margin: 4px 0;
+      border-radius: 6px;
+      transition: all 0.3s;
+
+      &:hover {
+        background-color: #f5f5f5;
+      }
+    }
+  }
+
+  .card2 {
+    min-height: 400px;
+    width:auto;
+    display: flex;
+    flex-direction: column;
+
+    .card-select2 {
+      display: block;
+      padding: 10px 12px;
+      margin: 4px 0;
+      border-radius: 4px;
+      transition: all 0.3s;
+
+      &:hover {
+        background-color: #f0f7ff;
+      }
+
+      .secondary-selection {
+        margin-top: 16px;
+      }
+
+    }
+  }
+
+  .cardButtons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding-top: 24px;
+    margin-top: auto;
+  }
+}
+
 </style>
