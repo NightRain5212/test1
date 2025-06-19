@@ -1,6 +1,8 @@
 import cv2
 import mediapipe as mp
 import numpy as np
+import asyncio
+from pathlib import Path
 
 class VideoAnalyzer:
     def __init__(self):
@@ -13,7 +15,49 @@ class VideoAnalyzer:
         self.pose = mp.solutions.pose.Pose()
         self.drawing = mp.solutions.drawing_utils
         
-    def analyze_frame(self, frame):
+    async def analyze(self, video_path):
+        """分析视频文件"""
+        try:
+            # 读取视频
+            cap = cv2.VideoCapture(str(video_path))
+            if not cap.isOpened():
+                raise ValueError(f"无法打开视频文件: {video_path}")
+            
+            # 分析视频帧
+            video_results = []
+            frame_count = 0
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                    
+                # 分析单帧
+                result = await self.analyze_frame(frame)
+                video_results.append(result)
+                
+                frame_count += 1
+                if frame_count % 100 == 0:  # 每100帧打印一次进度
+                    print(f"已处理 {frame_count}/{total_frames} 帧")
+            
+            cap.release()
+            
+            # 汇总结果
+            return await self.aggregate_results(video_results)
+            
+        except Exception as e:
+            print(f"视频分析错误: {str(e)}")
+            return {
+                "total": 0.0,
+                "details": {
+                    "eyebrow_raise": 0.0,
+                    "posture_stability": 0.0,
+                    "hand_movement": 0.0
+                }
+            }
+    
+    async def analyze_frame(self, frame):
         """分析单帧图像"""
         if frame is None:
             return {
@@ -47,6 +91,67 @@ class VideoAnalyzer:
                 "eyebrow_raise": 0.0,
                 "posture_stability": 0.0,
                 "hand_movement": 0.0
+            }
+    
+    async def aggregate_results(self, results):
+        """汇总分析结果"""
+        if not results:
+            return {
+                "total": 0.0,
+                "details": {
+                    "eyebrow_raise": 0.0,
+                    "posture_stability": 0.0,
+                    "hand_movement": 0.0
+                }
+            }
+            
+        try:
+            # 过滤掉无效的结果
+            valid_results = [r for r in results if r is not None]
+            
+            if not valid_results:
+                return {
+                    "total": 0.0,
+                    "details": {
+                        "eyebrow_raise": 0.0,
+                        "posture_stability": 0.0,
+                        "hand_movement": 0.0
+                    }
+                }
+            
+            # 计算各指标的平均值
+            eyebrow_raises = [float(r.get("eyebrow_raise", 0.0)) for r in valid_results]
+            posture_stabilities = [float(r.get("posture_stability", 0.0)) for r in valid_results]
+            hand_movements = [float(r.get("hand_movement", 0.0)) for r in valid_results]
+            
+            # 使用 numpy 的 nan_to_num 来处理可能的 NaN 值
+            details = {
+                "eyebrow_raise": float(np.nan_to_num(np.mean(eyebrow_raises))),
+                "posture_stability": float(np.nan_to_num(np.mean(posture_stabilities))),
+                "hand_movement": float(np.nan_to_num(np.mean(hand_movements)))
+            }
+            
+            # 计算总分
+            total = (
+                details["eyebrow_raise"] * 0.3 +
+                details["posture_stability"] * 0.4 +
+                details["hand_movement"] * 0.3
+            )
+            
+            return {
+                "total": float(total),
+                "details": details
+            }
+            
+        except Exception as e:
+            print(f"汇总结果错误: {str(e)}")
+            return {
+                "total": 0.0,
+                "details": {
+                    "eyebrow_raise": 0.0,
+                    "posture_stability": 0.0,
+                    "hand_movement": 0.0
+                }
             }
     
     def _calc_eyebrow_raise(self, results):

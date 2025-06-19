@@ -50,57 +50,84 @@
     </div>
 
     <Teleport to="#modal-root">
-      <n-card class="card" v-if="show_card">
-        <div v-if="currentStep === 0" class="card1">
-          简历
-          <div class="cardButtons">
-            <n-button type="error" ghost @click="closeCard">我再想想</n-button>
-            <n-button type="primary" @click="currentStep = 1">下一步</n-button>
+      <n-card class="startInterview" v-if="isbegin">
+        <div class="card-content">
+          <h3>开始面试</h3>
+          
+          <!-- 步骤1：选择岗位 -->
+          <div v-if="step === 1" class="step-container">
+            <h2>选择面试岗位</h2>
+            <a-select
+              v-model:value="jobType"
+              style="width: 200px"
+              placeholder="请选择岗位"
+            >
+              <a-select-option v-for="job in jobTypes" :key="job.value" :value="job.value">
+                {{ job.label }}
+              </a-select-option>
+            </a-select>
+            <a-button type="primary" @click="nextStep" :disabled="!jobType">下一步</a-button>
+          </div>
+
+          <!-- 步骤2：上传简历 -->
+          <div v-if="step === 2" class="step-container">
+            <h2>上传简历</h2>
+            <a-upload
+              :customRequest="handleResumeUpload"
+              :showUploadList="false"
+              accept=".txt,.doc,.docx,.pdf,.jpg,.jpeg,.png"
+            >
+              <a-button :loading="isProcessing">
+                <upload-outlined></upload-outlined>
+                选择文件
+              </a-button>
+            </a-upload>
+            <a-button type="primary" @click="nextStep" :disabled="!resumePath">下一步</a-button>
+          </div>
+
+          <!-- 步骤3：面试界面 -->
+          <div v-if="step === 3" class="interview-container">
+            <div class="video-section">
+              <video ref="videoRef" autoplay muted></video>
+              <div class="recording-indicator" v-if="isRecording">
+                <div class="recording-dot"></div>
+                正在录制...
+              </div>
+            </div>
+
+            <div class="question-section">
+              <template v-if="!isInterviewComplete">
+                <h3>当前问题：</h3>
+                <p class="question-text">{{ currentQuestion }}</p>
+                <div class="controls">
+                  <a-button
+                    type="primary"
+                    @click="startInterview"
+                    v-if="!isInterviewStarted"
+                  >
+                    开始面试
+                  </a-button>
+                  <a-button
+                    type="primary"
+                    @click="nextQuestion"
+                    v-if="isInterviewStarted && !isInterviewComplete"
+                  >
+                    下一个问题
+                  </a-button>
+                </div>
+              </template>
+              <template v-else>
+                <h3>面试完成</h3>
+                <div class="analysis-status">
+                  <div class="loading-spinner"></div>
+                  <p>正在生成分析报告...</p>
+                  <p class="analysis-progress">{{ analysisProgress }}</p>
+                </div>
+              </template>
+            </div>
           </div>
         </div>
-
-        <div v-else class="card2">
-          <!-- 第一级选择 -->
-          <n-radio-group v-model:value="primarySelection" name="primaryGroup">
-            <n-space vertical>
-              <n-radio v-for="item in primaryOptions" :key="item.value" :value="item.value" class="card-select">
-                {{ item.label }}
-              </n-radio>
-            </n-space>
-          </n-radio-group>
-
-      <!-- 第二级选择 -->
-      <div class="secondary-selection" v-if="primarySelection">
-        <n-divider />
-        <n-radio-group v-model:value="secondarySelection" name="secondaryGroup">
-          <n-grid :cols="3" :x-gap="12">
-            <n-gi
-              v-for="item in getSecondaryOptions()"
-              :key="item.value"
-            >
-              <n-radio
-                :value="item.value"
-                class="card-select2"
-              >
-                {{ item.label }}
-              </n-radio>
-            </n-gi>
-          </n-grid>
-        </n-radio-group>
-      </div>
-
-      <div class="cardButtons">
-        <n-button type="error" ghost @click="currentStep = 0">上一步</n-button>
-        <n-button 
-          type="primary" 
-          :disabled="!secondarySelection"
-          @click="toggleStart"
-        >
-          开始
-        </n-button>
-      </div>
-    </div>
-  </n-card>
+      </n-card>
 
       <!-- 内容区域启用指针事件 -->
       <div v-if="isModalOpen" class="modal-mask" style="pointer-events: auto;" @click.stop>
@@ -123,6 +150,8 @@
 import { BadgeRibbon, message } from 'ant-design-vue'
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { NButton, NRadio, NRadioGroup, NSpace, NUpload, NSpin, NIcon } from 'naive-ui'
+import axios from 'axios'
 // import{addModal,Notice} from '../components/Notice/index.js';
 import { NCard, NRadio, NRadioGroup, NSpace, NButton, NDivider, NGrid, NGi } from 'naive-ui'
 //摄像相关
@@ -276,7 +305,7 @@ function stopCamera() {
   if (cameraVideo.value) {
     cameraVideo.value.srcObject = null
   }
-  stopRecording();
+  stopAnswerRecording();
   isCameraActive.value = false
   cameraStream = null
   audioContext = null
@@ -286,14 +315,14 @@ function stopCamera() {
 //录像相关
 function toggleRecording() {
   if(isRecording.value){
-    stopRecording()
+    stopAnswerRecording()
     addModal({ message: '是否保存录像？', onConfirm: saveRecording });
   }else{
-    startRecording()
+    startAnswerRecording()
   }
 }
 // 开始录制函数
-function startRecording() {
+function startAnswerRecording() {
   if (!cameraStream) {
     message.error('请先开启摄像头')
     return
@@ -321,12 +350,17 @@ function startRecording() {
 } 
 
 // 停止录制
-function stopRecording(){
+function stopAnswerRecording() {
   if (mediaRecorder.value && mediaRecorder.value.state !== 'inactive') {
     mediaRecorder.value.stop()
     isRecording.value = false
     clearInterval(recordingTimer)
-    message.success('录制已停止')
+    message.success('回答录制完成')
+    
+    // 如果面试还未结束，显示下一题按钮
+    if (!isInterviewComplete.value) {
+      isAnswerComplete.value = true
+    }
   }
 }
 
@@ -343,88 +377,40 @@ function updateRecordingDuration() {
 // 保存录像函数
 async function saveRecording() {
   if (recordedChunks.value.length === 0) {
-    message.warning('没有可保存的录像')
+    message.warning('没有可保存的录制内容')
     return
   }
 
   try {
-    // 创建Blob对象
-    const blob = new Blob(recordedChunks.value, {
-      type: 'video/webm'
-    })
-
-    // 检查文件大小
-    const maxSize = 100 * 1024 * 1024 // 100MB
-    if (blob.size > maxSize) {
-      throw new Error(`文件大小超过限制：${(blob.size / 1024 / 1024).toFixed(2)}MB，最大允许100MB`)
-    }
-
-    // 创建FormData对象
+    const blob = new Blob(recordedChunks.value, { type: 'video/webm' })
     const formData = new FormData()
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-    const filename = `recording-${timestamp}.webm`
-    formData.append('file', new File([blob], filename, { type: 'video/webm' }))
+    formData.append('video', blob, 'interview.webm')
+    formData.append('jobType', jobType.value)
 
-    message.loading({ content: '正在上传视频...', key: 'upload' })
-
-    // 上传到服务器
-    const response = await fetch('http://localhost:8000/api/upload', {
-      method: 'POST',
-      body: formData
-    })
-
-    let result
-    try {
-      result = await response.json()
-    } catch (e) {
-      throw new Error('服务器响应格式错误')
-    }
-
-    if (!response.ok) {
-      throw new Error(result.detail || '上传失败')
-    }
-
-    if (!result.data?.filepath) {
-      throw new Error('服务器返回的文件路径无效')
-    }
-
-    const savedVideoPath = result.data.filepath
-
-    // 清理
-    recordedChunks.value = []
-    islatest_save.value = true
-
-    message.success({ content: '上传成功', key: 'upload' })
-
-    // 显示确认弹窗
-    addModal({
-      message: '录像已保存，是否立即进行分析？',
-      onConfirm: () => {
-        // 将视频路径存储到 localStorage
-        localStorage.setItem('lastRecordedVideo', savedVideoPath)
-        // 跳转到报告页面
-        router.push('/report')
-      },
-      onCancel: () => {
-        message.info('您可以稍后在报告页面进行分析')
+    const response = await axios.post('/api/save-video', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
       }
     })
 
-    return true
+    if (response.data.success) {
+      currentVideoPath.value = response.data.videoPath
+      islatest_save.value = true
+      message.success('视频保存成功')
+      // 保存成功后自动开始分析
+      handleInterviewComplete()
+    } else {
+      throw new Error(response.data.message || '保存失败')
+    }
   } catch (error) {
-    console.error('保存失败:', error)
-    message.error({ 
-      content: `保存失败: ${error.message}`, 
-      key: 'upload',
-      duration: 5 // 显示5秒
-    })
-    return false
+    console.error('保存视频出错:', error)
+    message.error('保存视频失败，请重试')
   }
 }
 
 // 组件卸载时清理
 onBeforeUnmount(() => {
-  stopRecording()
+  stopAnswerRecording()
   stopCamera()
   if (recordingTimer) {
     clearInterval(recordingTimer)
@@ -462,6 +448,254 @@ const handleCancel = () => {
   currentModal.value?.onCancel?.();
   showNextModal();
 };
+
+// 面试步骤
+const step = ref(1)
+const jobType = ref(null)
+const resumePath = ref('')
+const currentQuestion = ref('')
+const isAnswerComplete = ref(false)
+const isInterviewComplete = ref(false)
+const currentVideoPath = ref('')
+
+// 岗位选项
+const jobTypes = [
+  { value: "前端", label: "前端" },
+  { value: "后端", label: "后端" },
+  { value: "全栈", label: "全栈" },
+  { value: "移动端开发", label: "移动端开发" },
+  { value: "算法工程师", label: "算法工程师" },
+  { value: "软件测试", label: "软件测试" },
+  { value: "数据科学", label: "数据科学" },
+  { value: "UI设计", label: "UI设计" },
+  { value: "UX设计", label: "UX设计" },
+  { value: "运营", label: "运营" },
+  { value: "游戏开发", label: "游戏开发" },
+  { value: "云计算", label: "云计算" },
+  { value: "区块链", label: "区块链" },
+  { value: "AR/VR", label: "AR/VR" }
+]
+
+// 处理步骤切换
+async function nextStep() {
+  if (step.value === 1) {
+    if (!jobType.value) {
+      message.error('请选择面试岗位')
+      return
+    }
+    step.value = 2
+  } else if (step.value === 2) {
+    if (!resumePath.value) {
+      message.error('请先上传简历')
+      return
+    }
+    step.value = 3
+  }
+}
+
+// 添加处理状态
+const isProcessing = ref(false)
+
+// 修改文件上传处理函数
+async function handleResumeUpload({ file }) {
+  console.log('开始上传文件:', file.name, file.type)
+  isProcessing.value = true
+  
+  const formData = new FormData()
+  formData.append('file', file.file || file)
+  formData.append('job_type', jobType.value)
+  
+  try {
+    const response = await axios.post('http://localhost:8000/api/resume/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+
+    if (response.data.code === 200) {
+      resumePath.value = response.data.data.resume_path
+      message.success('简历上传成功')
+      
+      // 保存生成的问题
+      if (response.data.data.questions && response.data.data.questions.length > 0) {
+        interviewQuestions.value = response.data.data.questions
+        message.success('AI已生成面试问题')
+        
+        // 显示问题预览和确认对话框
+        showConfirmInterview()
+      } else {
+        message.error('生成面试问题失败')
+      }
+    }
+  } catch (error) {
+    console.error('上传错误详情:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      headers: error.response?.headers,
+      error: error
+    })
+    
+    if (error.response?.status === 422) {
+      message.error('不支持的文件类型或文件格式错误：' + (error.response?.data?.detail || '仅支持txt、doc、docx、pdf、jpg、jpeg、png格式'))
+    } else {
+      message.error('简历上传失败：' + (error.response?.data?.detail || error.message))
+    }
+  } finally {
+    isProcessing.value = false
+  }
+}
+
+// 添加面试问题相关的状态
+const interviewQuestions = ref([])
+const currentQuestionIndex = ref(0)
+const isInterviewStarted = ref(false)
+
+// 显示问题预览和确认对话框
+function showConfirmInterview() {
+  const previewQuestions = interviewQuestions.value.slice(0, 3).map((q, i) => `${i + 1}. ${q}`).join('\n')
+  const totalQuestions = interviewQuestions.value.length
+  
+  addModal({
+    message: `AI已根据您的简历生成了${totalQuestions}个面试问题。以下是部分问题预览：\n\n${previewQuestions}\n\n是否开始模拟面试？`,
+    onConfirm: startInterview,
+    onCancel: () => {
+      message.info('您可以稍后点击"开始面试"按钮开始')
+    }
+  })
+}
+
+// 开始面试
+async function startInterview() {
+  try {
+    // 开启摄像头
+    await startCamera()
+    if (!isCameraActive.value) {
+      throw new Error('无法启动摄像头')
+    }
+    
+    // 设置面试状态
+    isInterviewStarted.value = true
+    currentQuestionIndex.value = 0
+    
+    // 显示第一个问题
+    showCurrentQuestion()
+    
+    // 自动开始录制
+    startAnswerRecording()
+  } catch (error) {
+    message.error('启动面试失败：' + error.message)
+  }
+}
+
+// 显示当前问题
+function showCurrentQuestion() {
+  if (currentQuestionIndex.value < interviewQuestions.value.length) {
+    const question = interviewQuestions.value[currentQuestionIndex.value]
+    currentQuestion.value = question
+  } else {
+    // 面试结束
+    isInterviewComplete.value = true
+    message.success('面试完成！')
+    stopAnswerRecording()
+    stopCamera()
+  }
+}
+
+// 处理下一个问题
+function nextQuestion() {
+  stopAnswerRecording()
+  currentQuestionIndex.value++
+  isAnswerComplete.value = false
+  showCurrentQuestion()
+  
+  // 如果还有问题，自动开始录制
+  if (!isInterviewComplete.value) {
+    startAnswerRecording()
+  }
+}
+
+// 获取第一个问题
+async function getFirstQuestion() {
+  try {
+    const response = await axios.post('/api/interview/next_question', {
+      resume_path: resumePath.value
+    })
+    if (response.data.code === 200) {
+      currentQuestion.value = response.data.data.question
+      isAnswerComplete.value = false
+      isInterviewComplete.value = response.data.data.completed
+    }
+  } catch (error) {
+    message.error('获取面试问题失败：' + (error.response?.data?.detail || error.message))
+    console.error('获取问题错误详情:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      headers: error.response?.headers,
+      error: error
+    })
+  }
+}
+
+// 完成面试
+async function finishInterview() {
+  try {
+    const response = await axios.post('/api/interview/analyze', {
+      video_path: lastVideoPath.value,
+      resume_path: resumePath.value
+    })
+    if (response.data.code === 200) {
+      // 跳转到报告页面
+      router.push({
+        path: '/report',
+        query: {
+          report: JSON.stringify(response.data.data)
+        }
+      })
+    }
+  } catch (error) {
+    message.error('生成面试报告失败：' + (error.response?.data?.detail || error.message))
+    console.error(error)
+  }
+}
+
+const analysisProgress = ref('准备分析...')
+
+// 添加分析状态和进度更新函数
+async function startAnalysis() {
+  try {
+    analysisProgress.value = '正在分析视频...'
+    // 调用后端分析接口
+    const response = await axios.post('/api/analyze', {
+      videoPath: currentVideoPath.value,
+      jobType: jobType.value
+    })
+    
+    if (response.data.success) {
+      analysisProgress.value = '分析完成，正在生成报告...'
+      // 等待2秒后跳转到报告页面
+      setTimeout(() => {
+        router.push({
+          path: '/report',
+          query: { 
+            analysisId: response.data.analysisId,
+            jobType: jobType.value
+          }
+        })
+      }, 2000)
+    } else {
+      throw new Error(response.data.message || '分析失败')
+    }
+  } catch (error) {
+    console.error('分析出错:', error)
+    analysisProgress.value = '分析失败，请重试'
+  }
+}
+
+// 修改面试完成处理函数
+function handleInterviewComplete() {
+  isInterviewComplete.value = true
+  startAnalysis()
+}
 </script>
 
 <style scoped lang="scss">
@@ -478,161 +712,142 @@ const handleCancel = () => {
 
 .viewarea {
   height: 100%;
-  background: rgb(211, 205, 205);
+  background: #fff;
   flex: 8;
   position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
   
-    .camera {
-      width: 80%;
-      height: auto;
-      /* 高度自适应 */
-      aspect-ratio: 16/9;
-      /* 固定宽高比（常用摄像头比例） */
-      object-fit: contain;
-      /* 改为contain以完整显示画面 */
-      background: #000;
-      transform: scaleX(-1);
-      margin: 0 auto;
-      /* 水平居中 */
-    }
+  .camera {
+    width: 80%;
+    height: auto;
+    aspect-ratio: 16/9;
+    object-fit: cover;
+    background: #000;
+    transform: scaleX(-1);
+    margin: 0 auto;
+  }
   
-    .camera-pip {
-      position: fixed;
-      /* 固定定位 */
-      right: 10px;
-      /* 距离右侧距离 */
-      bottom: 10px;
-      /* 距离底部距离 */
-      width: 200px;
-      /* 小窗宽度 */
-      height: auto;
-      /* 高度自适应 */
-      border: 2px solid #fff;
-      /* 可选边框 */
-      border-radius: 8px;
-      /* 圆角 */
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
-      /* 阴影增强悬浮感 */
-      z-index: 1000;
-      /* 确保悬浮在最上层 */
-      background-color: #000;
-  
-      :hover {
-        transform: scale(1.05);
-        transition: transform 0.2s;
-      }
-    }
-  
-    .placeholder {
-      color: #666;
-      font-size: 1.2rem;
+  .camera-pip {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    width: 180px;
+    height: auto;
+    border: 1px solid #fff;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    background-color: #000;
+
+    &:hover {
+      transform: scale(1.02);
+      transition: transform 0.2s;
     }
   }
+  
+  .placeholder {
+    color: #999;
+    font-size: 1rem;
+  }
+}
+
 .controlarea {
   background: #fff;
   height: 100%;
   display: flex;
-  flex-direction: column; // 垂直排列按钮
+  flex-direction: column;
   flex: 2;
-  gap: 10px; // 按钮间距
-  padding: 10px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
+  gap: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
 }
 
 .btn1 {
-  background: #007bff;
+  background: #1890ff;
   width: auto;
-  height: 40px;
+  height: 36px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   color: white;
-  transition: background-color 0.3s ease;
+  font-size: 14px;
+  transition: all 0.3s;
 
   &:hover {
-    background: #0056b3;
+    background: #40a9ff;
   }
+
+  &:active {
+    background: #096dd9;
+  }
+
   &.recording {
-    background: #231e1e;
-    color: white;
+    background: #ff4d4f;
     
     &:hover {
-      background: #786767;
+      background: #ff7875;
     }
     
     &:active {
-      background: #bab6b6;
+      background: #d9363e;
     }
   }
 }
 
 .sound-slider {
   display: flex;
-  /* 启用 Flex 布局 */
   align-items: center;
-  /* 垂直居中 */
-  gap: 12px;
-  /* 图标和滑块之间的间距 */
-  padding: 8px 12px;
-  /* 内边距 */
+  gap: 8px;
+  padding: 8px;
   border-radius: 4px;
+  background: #f5f5f5;
 
-  /* 圆角（可选） */
   .sound-icon {
     flex-shrink: 0;
-    /* 防止图标被压缩 */
-    width: 24px;
-    /* 图标宽度 */
-    height: 24px;
-    /* 图标高度 */
-    color: #8b9095;
-    /* 图标颜色 */
+    width: 20px;
+    height: 20px;
+    color: #595959;
   }
 
   .slider {
     flex-grow: 1;
-    /* 滑块占据剩余空间 */
   }
 
-  /* 调整 Ant Design 滑块样式 */
   .ant-slider {
     margin: 0;
-    /* 去除默认外边距 */
   }
 
   .ant-slider-track {
-    background-color: #848b93;
-    /* 滑块轨道颜色 */
+    background-color: #1890ff;
   }
 
   .ant-slider-handle {
-    border-color: #5e6266;
-    /* 滑块手柄颜色 */
+    border-color: #1890ff;
   }
 }
+
 .modal-mask {
   position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 360px;
+  width: 320px;
   background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  z-index: 999;
-  transition: opacity 0.3s ease;
+  z-index: 1000;
+
   .modal-header {
-    background: #007bff;
-    height: 48px;
+    background: #f5f5f5;
+    height: 40px;
     width: 100%;
     display: flex;
     align-items: center;
@@ -641,12 +856,13 @@ const handleCancel = () => {
     
     h3 {
       margin: 0;
-      color: white;
-      font-size: 16px;
+      color: #262626;
+      font-size: 14px;
     }
   }
+
   .modal-content {
-    padding: 24px;
+    padding: 16px;
     background: white;
     
     p {
@@ -656,8 +872,9 @@ const handleCancel = () => {
       line-height: 1.5;
     }
   }
-.modal-footer {
-    padding: 12px 16px;
+
+  .modal-footer {
+    padding: 8px 16px;
     background: #f5f5f5;
     display: flex;
     justify-content: flex-end;
@@ -665,116 +882,81 @@ const handleCancel = () => {
     border-top: 1px solid #e8e8e8;
 
     .btn {
-      min-width: 80px;
+      min-width: 64px;
       height: 32px;
       font-size: 14px;
-      padding: 0 15px;
-      border-radius: 4px;
-      transition: background-color 0.3s ease;
+      padding: 0 12px;
+      border-radius: 2px;
+      transition: all 0.3s;
       
       &.confirm {
-        background: #28a745;
+        background: #1890ff;
         color: white;
         
         &:hover {
-          background: #218838;
+          background: #40a9ff;
         }
         
         &:active {
-          background: #d1d4d6;
+          background: #096dd9;
         }
       }
       
       &.cancle {
-        background: #dc3545;
-        color: white;
+        background: #f5f5f5;
+        color: #595959;
+        border: 1px solid #d9d9d9;
         
         &:hover {
-          background: #c82333;
+          background: #fafafa;
+          border-color: #40a9ff;
+          color: #40a9ff;
         }
         
         &:active {
-          background: #d1d4d6;
+          background: #f5f5f5;
+          border-color: #096dd9;
+          color: #096dd9;
         }
       }
     }
   }
 }
+
 .recording-duration {
-  color: #fff;
+  color: #595959;
   text-align: center;
-  font-size: 1.2rem;
-  padding: 8px;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 4px;
-  margin: 8px 0;
+  font-size: 14px;
+  padding: 6px;
+  background: #f5f5f5;
+  border-radius: 2px;
+  margin: 4px 0;
 }
-.startInterview{
-  position: fixed; /* 改为fixed以覆盖全屏 */
-  top: 50%;       /* 先定位到视口中心 */
+
+.startInterview {
+  position: fixed;
+  top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-    /* 双方向偏移自身50% */
-    width: 500px;
-    height: 300px;
-    z-index: 1000;
-    /* 确保在最上层 */
-    background: white;
-    /* 避免透明 */
-    border-radius: 8px;
-    /* 可选圆角 */
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
-    /* 增强模态框效果 */
-  
-    .card-content {
-      padding: 5px 5px;
-    }
-  
-    .card-action {
-      padding: 12px 16px;
-      background: #f5f5f5;
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-      border-top: 1px solid #e8e8e8;
-  
-      .btn {
-        min-width: 80px;
-        height: 32px;
-        font-size: 14px;
-        padding: 0 15px;
-        border-radius: 4px;
-        transition: background-color 0.3s ease;
-  
-        &.confirm {
-          background: #28a745;
-          color: white;
-  
-          &:hover {
-            background: #218838;
-          }
-  
-          &:active {
-            background: #d1d4d6;
-          }
-        }
-  
-        &.cancle {
-          background: #dc3545;
-          color: white;
-  
-          &:hover {
-            background: #c82333;
-          }
-  
-          &:active {
-            background: #d1d4d6;
-          }
-        }
-      }
-    }
+  width: 480px;
+  min-height: 320px;
+  z-index: 1000;
+  background: white;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.card-content {
+  padding: 24px;
+
+  h3 {
+    margin-bottom: 16px;
+    text-align: center;
+    font-size: 18px;
+    color: #262626;
   }
 
+<<<<<<< HEAD
 .card {
   position: fixed;
   top: 50%;
@@ -837,4 +1019,123 @@ const handleCancel = () => {
   }
 }
 
+=======
+  h4 {
+    margin-bottom: 12px;
+    color: #595959;
+  }
+}
+
+.step-container {
+  text-align: center;
+  margin: 32px 0;
+
+  h2 {
+    margin-bottom: 16px;
+    font-size: 16px;
+    color: #262626;
+  }
+}
+
+.interview-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.video-section {
+  position: relative;
+
+  video {
+    width: 100%;
+    border-radius: 4px;
+    background-color: #f5f5f5;
+  }
+
+  .recording-indicator {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background-color: rgba(0, 0, 0, 0.75);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+  }
+
+  .recording-dot {
+    width: 8px;
+    height: 8px;
+    background-color: #ff4d4f;
+    border-radius: 50%;
+    animation: blink 1s infinite;
+  }
+}
+
+.question-section {
+  padding: 16px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+
+  h3 {
+    margin: 0 0 12px;
+    font-size: 16px;
+    color: #262626;
+  }
+
+  .question-text {
+    font-size: 14px;
+    margin: 16px 0;
+    line-height: 1.5;
+    color: #595959;
+  }
+
+  .controls {
+    margin-top: 16px;
+    text-align: center;
+  }
+}
+
+@keyframes blink {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+.analysis-status {
+  text-align: center;
+  padding: 20px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 20px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.analysis-progress {
+  color: #666;
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+>>>>>>> 0ebcc382c58c30169c740ec104fa0e08286b48c2
 </style>

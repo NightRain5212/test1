@@ -166,6 +166,7 @@ import * as echarts from 'echarts'
 import { NButton, NSplit, NProgress } from 'naive-ui'
 import Graph from '../components/Graph.vue'
 import { message } from 'ant-design-vue'
+import { useRoute } from 'vue-router'
 
 const videoSrc = ref('')
 const videoEl = ref(null)
@@ -175,7 +176,20 @@ const analysisResult = ref(null)
 let chartInstance = null
 
 // 初始化图表
-onMounted(() => {
+onMounted(async () => {
+  // 获取路由参数中的报告数据
+  const route = useRoute()
+  if (route.query.report) {
+    try {
+      analysisResult.value = JSON.parse(route.query.report)
+      // 初始化图表
+      initChart()
+    } catch (error) {
+      console.error('解析报告数据失败:', error)
+      message.error('加载报告失败')
+    }
+  }
+
   // 获取最新录制的视频路径
   const lastRecordedVideo = localStorage.getItem('lastRecordedVideo')
   if (lastRecordedVideo) {
@@ -183,6 +197,9 @@ onMounted(() => {
     const filename = lastRecordedVideo.split('\\').pop().split('/').pop()
     // 构建视频URL
     videoSrc.value = `http://localhost:8000/videos/${filename}`
+    
+    // 自动开始分析
+    await startAnalysis()
   }
   
   chartInstance = echarts.init(chartEl.value)
@@ -259,8 +276,7 @@ async function startAnalysis() {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        video_path: filename,
-        resume_text: ''
+        video_path: filename
       })
     })
 
@@ -335,13 +351,76 @@ function updateChart(data) {
   chartInstance.setOption(option)
 }
 
-// 获取进度条颜色
-function getProgressColor(value) {
-  if (value >= 0.8) return '#18a058'
-  if (value >= 0.6) return '#2080f0'
-  if (value >= 0.4) return '#f0a020'
-  return '#d03050'
+// 初始化图表
+const initChart = () => {
+  if (!analysisResult.value || !chartInstance) return
+
+  const option = {
+    title: {
+      text: '面试表现分析',
+      left: 'center'
+    },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: {
+        type: 'shadow'
+      }
+    },
+    legend: {
+      data: ['得分'],
+      bottom: 0
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '15%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      data: ['视频表现', '语音表现', '内容表现']
+    },
+    yAxis: {
+      type: 'value',
+      max: 100
+    },
+    series: [
+      {
+        name: '得分',
+        type: 'bar',
+        data: [
+          analysisResult.value.scores.video * 100,
+          analysisResult.value.scores.voice * 100,
+          analysisResult.value.scores.text * 100
+        ],
+        itemStyle: {
+          color: function(params) {
+            const value = params.value
+            if (value >= 80) return '#52c41a'
+            if (value >= 60) return '#1890ff'
+            return '#f5222d'
+          }
+        }
+      }
+    ]
+  }
+
+  chartInstance.setOption(option)
 }
+
+// 获取进度条颜色
+const getProgressColor = (value) => {
+  if (value >= 0.8) return '#52c41a'
+  if (value >= 0.6) return '#1890ff'
+  return '#f5222d'
+}
+
+// 监听分析结果变化
+watch(analysisResult, () => {
+  if (analysisResult.value) {
+    initChart()
+  }
+}, { deep: true })
 
 const dragHeight = ref(200)
 const isDragging = ref(false)
