@@ -10,7 +10,7 @@
     </div>
 
     <div class="controlarea">
-      <button v-if="!show_start" @click="show_card=true" class="btn1">
+      <button v-if="!show_start" @click="show_card = true" class="btn1">
         开始面试
       </button>
       <button @click="toggleCamera" class="btn1">
@@ -48,31 +48,26 @@
         <a-slider v-model:value="sliderValue" :min="0" :max="100" class="slider" />
       </div>
     </div>
-    
+
     <Teleport to="#modal-root">
       <n-card class="card" v-if="show_card">
-    <div v-if="currentStep === 0" class="card1">
-     简历
-      <div class="cardButtons">
-        <n-button type="error" ghost @click="closeCard">我再想想</n-button>
-        <n-button type="primary" @click="currentStep = 1">下一步</n-button>
-      </div>
-    </div>
+        <div v-if="currentStep === 0" class="card1">
+          简历
+          <div class="cardButtons">
+            <n-button type="error" ghost @click="closeCard">我再想想</n-button>
+            <n-button type="primary" @click="currentStep = 1">下一步</n-button>
+          </div>
+        </div>
 
-    <div v-else class="card2">
-      <!-- 第一级选择 -->
-      <n-radio-group v-model:value="primarySelection" name="primaryGroup">
-        <n-space vertical>
-          <n-radio
-            v-for="item in primaryOptions"
-            :key="item.value"
-            :value="item.value"
-            class="card-select"
-          >
-            {{ item.label }}
-          </n-radio>
-        </n-space>
-      </n-radio-group>
+        <div v-else class="card2">
+          <!-- 第一级选择 -->
+          <n-radio-group v-model:value="primarySelection" name="primaryGroup">
+            <n-space vertical>
+              <n-radio v-for="item in primaryOptions" :key="item.value" :value="item.value" class="card-select">
+                {{ item.label }}
+              </n-radio>
+            </n-space>
+          </n-radio-group>
 
       <!-- 第二级选择 -->
       <div class="secondary-selection" v-if="primarySelection">
