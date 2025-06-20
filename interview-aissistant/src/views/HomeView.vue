@@ -50,81 +50,102 @@
     </div>
 
     <Teleport to="#modal-root">
-      <n-card class="startInterview" v-if="isbegin">
-        <div class="card-content">
-          <h3>开始面试</h3>
-          
-          <!-- 步骤1：选择岗位 -->
-          <div v-if="step === 1" class="step-container">
-            <h2>选择面试岗位</h2>
-            <a-select
-              v-model:value="jobType"
-              style="width: 200px"
-              placeholder="请选择岗位"
-            >
-              <a-select-option v-for="job in jobTypes" :key="job.value" :value="job.value">
-                {{ job.label }}
-              </a-select-option>
-            </a-select>
-            <a-button type="primary" @click="nextStep" :disabled="!jobType">下一步</a-button>
+      <n-card class="startInterview" v-if="show_card">
+        <!-- 步骤1：选择岗位 -->
+        <div v-if="step === 1" class="step1-card">
+          <div class="card11">
+            <n-card title="请选择岗位" size="small">
+              <n-radio-group v-model:value="jobTypeSelection" name="primaryGroup">
+                <n-space vertical>
+                  <n-radio v-for="item in jobTypeOptions" :key="item.value" :value="item.value" class="job_type">
+                    {{ item.label }}
+                  </n-radio>
+                </n-space>
+              </n-radio-group>
+            </n-card>
           </div>
 
-          <!-- 步骤2：上传简历 -->
-          <div v-if="step === 2" class="step-container">
-            <h2>上传简历</h2>
-            <a-upload
-              :customRequest="handleResumeUpload"
-              :showUploadList="false"
-              accept=".txt,.doc,.docx,.pdf,.jpg,.jpeg,.png"
-            >
-              <a-button :loading="isProcessing">
-                <upload-outlined></upload-outlined>
-                选择文件
-              </a-button>
-            </a-upload>
-            <a-button type="primary" @click="nextStep" :disabled="!resumePath">下一步</a-button>
+          <div class="card12">
+            <n-card size="small" v-if="jobTypeSelection">
+              <n-radio-group v-model:value="jobSelection" name="secondaryGroup">
+                <n-grid :cols="4" :x-gap="12" :y-gap="8">
+                  <n-gi v-for="item in getjobsOptions()" :key="item.value">
+                    <n-radio :value="item.value" class="jobs">
+                      {{ item.label }}
+                    </n-radio>
+                  </n-gi>
+                </n-grid>
+              </n-radio-group>
+            </n-card>
+            <n-card size="small" v-else>
+            </n-card>
           </div>
 
-          <!-- 步骤3：面试界面 -->
-          <div v-if="step === 3" class="interview-container">
-            <div class="video-section">
-              <video ref="videoRef" autoplay muted></video>
-              <div class="recording-indicator" v-if="isRecording">
-                <div class="recording-dot"></div>
-                正在录制...
+          <!-- 页脚按钮 -->
+          <div class="footer-buttons">
+            <n-button type="default" ghost @click="show_card = false">
+              我再想想
+            </n-button>
+            <n-button type="primary" :disabled="!jobSelection" @click="step = 2">
+              继续
+            </n-button>
+          </div>
+        </div>
+        <!-- 步骤2：上传简历 -->
+        <div v-if="step === 2" class="step2-card">
+          <h2>上传简历</h2>
+          <a-upload :customRequest="handleResumeUpload" :showUploadList="false"
+            accept=".txt,.doc,.docx,.pdf,.jpg,.jpeg,.png">
+            <a-button :loading="isProcessing">
+              <upload-outlined></upload-outlined>
+              选择文件
+            </a-button>
+          </a-upload>
+          <a-button type="default" @click="showResumeEditor = true">没有简历？在线编辑</a-button>
+
+          <!-- 简历编辑器弹窗 -->
+          <a-modal v-model:visible="showResumeEditor" title="在线简历编辑" width="800px" :footer="null">
+            <ResumeEditor @submit="handleResumeEditSubmit" />
+          </a-modal>
+        </div>
+        <template v-if="step === 2" #footer>
+          <div class="footer-buttons">
+            <a-button type="default" @click="step = 1">上一步</a-button>
+            <a-button type="primary" @click="show_start=true" :disabled="!resumePath">开始</a-button>
+          </div>
+        </template>
+
+        <!-- 步骤3：面试界面 -->
+        <div v-if="step === 3" class="step3-card">
+          <div class="video-section">
+            <video ref="videoRef" autoplay muted></video>
+            <div class="recording-indicator" v-if="isRecording">
+              <div class="recording-dot"></div>
+              正在录制...
+            </div>
+          </div>
+
+          <div class="question-section">
+            <template v-if="!isInterviewComplete">
+              <h3>当前问题：</h3>
+              <p class="question-text">{{ currentQuestion }}</p>
+              <div class="controls">
+                <a-button type="primary" @click="startInterview" v-if="!isInterviewStarted">
+                  开始面试
+                </a-button>
+                <a-button type="primary" @click="nextQuestion" v-if="isInterviewStarted && !isInterviewComplete">
+                  下一个问题
+                </a-button>
               </div>
-            </div>
-
-            <div class="question-section">
-              <template v-if="!isInterviewComplete">
-                <h3>当前问题：</h3>
-                <p class="question-text">{{ currentQuestion }}</p>
-                <div class="controls">
-                  <a-button
-                    type="primary"
-                    @click="startInterview"
-                    v-if="!isInterviewStarted"
-                  >
-                    开始面试
-                  </a-button>
-                  <a-button
-                    type="primary"
-                    @click="nextQuestion"
-                    v-if="isInterviewStarted && !isInterviewComplete"
-                  >
-                    下一个问题
-                  </a-button>
-                </div>
-              </template>
-              <template v-else>
-                <h3>面试完成</h3>
-                <div class="analysis-status">
-                  <div class="loading-spinner"></div>
-                  <p>正在生成分析报告...</p>
-                  <p class="analysis-progress">{{ analysisProgress }}</p>
-                </div>
-              </template>
-            </div>
+            </template>
+            <template v-else>
+              <h3>面试完成</h3>
+              <div class="analysis-status">
+                <div class="loading-spinner"></div>
+                <p>正在生成分析报告...</p>
+                <p class="analysis-progress">{{ analysisProgress }}</p>
+              </div>
+            </template>
           </div>
         </div>
       </n-card>
@@ -150,10 +171,10 @@
 import { BadgeRibbon, message } from 'ant-design-vue'
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { NButton, NRadio, NRadioGroup, NSpace, NUpload, NSpin, NIcon } from 'naive-ui'
 import axios from 'axios'
+import ResumeEditor from '../components/ResumeEditor.vue'
 // import{addModal,Notice} from '../components/Notice/index.js';
-import { NCard, NRadio, NRadioGroup, NSpace, NButton, NDivider, NGrid, NGi } from 'naive-ui'
+import { NCard, NRadio, NRadioGroup, NSpace, NButton, NDivider, NGrid, NGi,NUpload, NSpin, NIcon } from 'naive-ui'
 //摄像相关
 const isCameraActive = ref(false)
 const cameraVideo = ref(null)
@@ -168,7 +189,6 @@ const recordingDuration = ref('00:00')
 let recordingTimer = null
 const islatest_save = ref(false);//最新的录像是否保存
 
-
 let cameraStream = null
 let audioContext = null
 let gainNode = null// 浏览器内置的音频处理节点
@@ -178,6 +198,7 @@ const router = useRouter()
 //开始面试相关
 const show_card = ref(false);
 const show_start = ref(false);
+const showResumeEditor=ref(false);
 async function toggleStart() {
   if (!isCameraActive.value){
     console.log('请打开摄像头');
@@ -185,24 +206,24 @@ async function toggleStart() {
   }
   if(!isRecording.value){
     console.log('请开始录音');
-    await startRecording();
+    await startAnswerRecording();
   }
   console.log('开始面试');
   closeCard();
 }
 
-const currentStep = ref(0)
-const primarySelection = ref('')
-const secondarySelection = ref('')
+const jobTypeSelection = ref('')
+const jobSelection = ref('')
 
-const primaryOptions = [
+const jobTypeOptions = [
   { value: 'development', label: '开发岗' },
   { value: 'research', label: '研发岗' },
   { value: 'technical', label: '技术岗' },
+  { value: 'design', label: '设计岗' },
   { value: 'testing', label: '测试岗' }
 ]
 
-const secondaryOptions = {
+const jobsOptions = {
   development: [
     { value: 'frontend', label: '前端开发' },
     { value: 'backend', label: '后端开发' },
@@ -217,8 +238,11 @@ const secondaryOptions = {
   ],
   technical: [
     { value: 'algorithm', label: '算法工程师' },
-    { value: 'data-analysis', label: '数据分析' },
-    { value: 'data-mining', label: '数据挖掘' }
+    { value: 'data-analysis', label: '数据分析与挖掘' }
+  ],
+  design: [
+    { value: 'uix', label: 'UI/UX设计师' },
+    { value: 'effect', label: '特效设计师' }
   ],
   testing: [
     { value: 'qa', label: '软件测试工程师' },
@@ -226,15 +250,228 @@ const secondaryOptions = {
 }
 
 const getPrimaryLabel = () => {
-  return primaryOptions.find(item => item.value === primarySelection.value)?.label || ''
+  return jobTypeOptions.find(item => item.value === jobTypeSelection.value)?.label || ''
 }
 
-const getSecondaryOptions = () => {
-  return secondaryOptions[primarySelection.value] || []
+const getjobsOptions = () => {
+  return jobsOptions[jobTypeSelection.value] || []
 }
 
 const closeCard = () => {
   show_card.value = false
+}
+// 面试步骤
+const step = ref(1)
+const resumePath = ref('')
+const currentQuestion = ref('')
+const isAnswerComplete = ref(false)
+const isInterviewComplete = ref(false)
+const currentVideoPath = ref('')
+
+// 添加处理状态
+const isProcessing = ref(false)
+
+// 修改文件上传处理函数
+async function handleResumeUpload({ file }) {
+  console.log('开始上传文件:', file.name, file.type)
+  isProcessing.value = true
+  
+  const formData = new FormData()
+  formData.append('file', file.file || file)
+  formData.append('job_type', jobSelection.value)
+  
+  try {
+    const response = await axios.post('resume/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+
+    if (response.data.code === 200) {
+      resumePath.value = response.data.data.resume_path
+      message.success('简历上传成功')
+      
+      // 保存生成的问题
+      if (response.data.data.questions && response.data.data.questions.length > 0) {
+        interviewQuestions.value = response.data.data.questions
+        message.success('AI已生成面试问题')
+        
+        // 显示问题预览和确认对话框
+        showConfirmInterview()
+      } else {
+        message.error('生成面试问题失败')
+      }
+    }
+  } catch (error) {
+    console.error('上传错误详情:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      headers: error.response?.headers,
+      error: error
+    })
+    
+    if (error.response?.status === 422) {
+      message.error('不支持的文件类型或文件格式错误：' + (error.response?.data?.detail || '仅支持txt、doc、docx、pdf、jpg、jpeg、png格式'))
+    } else {
+      message.error('简历上传失败：' + (error.response?.data?.detail || error.message))
+    }
+  } finally {
+    isProcessing.value = false
+  }
+}
+function handleResumeEditSubmit(){
+  console.log('yes');
+}
+// 添加面试问题相关的状态
+const interviewQuestions = ref([])
+const currentQuestionIndex = ref(0)
+const isInterviewStarted = ref(false)
+
+// 显示问题预览和确认对话框
+function showConfirmInterview() {
+  const previewQuestions = interviewQuestions.value.slice(0, 3).map((q, i) => `${i + 1}. ${q}`).join('\n')
+  const totalQuestions = interviewQuestions.value.length
+  
+  addModal({
+    message: `AI已根据您的简历生成了${totalQuestions}个面试问题。以下是部分问题预览：\n\n${previewQuestions}\n\n是否开始模拟面试？`,
+    onConfirm: startInterview,
+    onCancel: () => {
+      message.info('您可以稍后点击"开始面试"按钮开始')
+    }
+  })
+}
+
+// 开始面试
+async function startInterview() {
+  try {
+    // 开启摄像头
+    await startCamera()
+    if (!isCameraActive.value) {
+      throw new Error('无法启动摄像头')
+    }
+    
+    // 设置面试状态
+    isInterviewStarted.value = true
+    currentQuestionIndex.value = 0
+    
+    // 显示第一个问题
+    showCurrentQuestion()
+    
+    // 自动开始录制
+    startAnswerRecording()
+  } catch (error) {
+    message.error('启动面试失败：' + error.message)
+  }
+}
+
+// 显示当前问题
+function showCurrentQuestion() {
+  if (currentQuestionIndex.value < interviewQuestions.value.length) {
+    const question = interviewQuestions.value[currentQuestionIndex.value]
+    currentQuestion.value = question
+  } else {
+    // 面试结束
+    isInterviewComplete.value = true
+    message.success('面试完成！')
+    stopAnswerRecording()
+    stopCamera()
+  }
+}
+
+// 处理下一个问题
+function nextQuestion() {
+  stopAnswerRecording()
+  currentQuestionIndex.value++
+  isAnswerComplete.value = false
+  showCurrentQuestion()
+  
+  // 如果还有问题，自动开始录制
+  if (!isInterviewComplete.value) {
+    startAnswerRecording()
+  }
+}
+
+// 获取第一个问题
+async function getFirstQuestion() {
+  try {
+    const response = await axios.post('/api/interview/next_question', {
+      resume_path: resumePath.value
+    })
+    if (response.data.code === 200) {
+      currentQuestion.value = response.data.data.question
+      isAnswerComplete.value = false
+      isInterviewComplete.value = response.data.data.completed
+    }
+  } catch (error) {
+    message.error('获取面试问题失败：' + (error.response?.data?.detail || error.message))
+    console.error('获取问题错误详情:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      headers: error.response?.headers,
+      error: error
+    })
+  }
+}
+
+// 完成面试
+async function finishInterview() {
+  try {
+    const response = await axios.post('/api/interview/analyze', {
+      video_path: lastVideoPath.value,
+      resume_path: resumePath.value
+    })
+    if (response.data.code === 200) {
+      // 跳转到报告页面
+      router.push({
+        path: '/report',
+        query: {
+          report: JSON.stringify(response.data.data)
+        }
+      })
+    }
+  } catch (error) {
+    message.error('生成面试报告失败：' + (error.response?.data?.detail || error.message))
+    console.error(error)
+  }
+}
+
+const analysisProgress = ref('准备分析...')
+
+// 添加分析状态和进度更新函数
+async function startAnalysis() {
+  try {
+    analysisProgress.value = '正在分析视频...'
+    // 调用后端分析接口
+    const response = await axios.post('/api/analyze', {
+      videoPath: currentVideoPath.value,
+      jobType: jobType.value
+    })
+    
+    if (response.data.success) {
+      analysisProgress.value = '分析完成，正在生成报告...'
+      // 等待2秒后跳转到报告页面
+      setTimeout(() => {
+        router.push({
+          path: '/report',
+          query: { 
+            analysisId: response.data.analysisId,
+            jobType: jobType.value
+          }
+        })
+      }, 2000)
+    } else {
+      throw new Error(response.data.message || '分析失败')
+    }
+  } catch (error) {
+    console.error('分析出错:', error)
+    analysisProgress.value = '分析失败，请重试'
+  }
+}
+
+// 修改面试完成处理函数
+function handleInterviewComplete() {
+  isInterviewComplete.value = true
+  startAnalysis()
 }
 
 //声音相关
@@ -449,253 +686,6 @@ const handleCancel = () => {
   showNextModal();
 };
 
-// 面试步骤
-const step = ref(1)
-const jobType = ref(null)
-const resumePath = ref('')
-const currentQuestion = ref('')
-const isAnswerComplete = ref(false)
-const isInterviewComplete = ref(false)
-const currentVideoPath = ref('')
-
-// 岗位选项
-const jobTypes = [
-  { value: "前端", label: "前端" },
-  { value: "后端", label: "后端" },
-  { value: "全栈", label: "全栈" },
-  { value: "移动端开发", label: "移动端开发" },
-  { value: "算法工程师", label: "算法工程师" },
-  { value: "软件测试", label: "软件测试" },
-  { value: "数据科学", label: "数据科学" },
-  { value: "UI设计", label: "UI设计" },
-  { value: "UX设计", label: "UX设计" },
-  { value: "运营", label: "运营" },
-  { value: "游戏开发", label: "游戏开发" },
-  { value: "云计算", label: "云计算" },
-  { value: "区块链", label: "区块链" },
-  { value: "AR/VR", label: "AR/VR" }
-]
-
-// 处理步骤切换
-async function nextStep() {
-  if (step.value === 1) {
-    if (!jobType.value) {
-      message.error('请选择面试岗位')
-      return
-    }
-    step.value = 2
-  } else if (step.value === 2) {
-    if (!resumePath.value) {
-      message.error('请先上传简历')
-      return
-    }
-    step.value = 3
-  }
-}
-
-// 添加处理状态
-const isProcessing = ref(false)
-
-// 修改文件上传处理函数
-async function handleResumeUpload({ file }) {
-  console.log('开始上传文件:', file.name, file.type)
-  isProcessing.value = true
-  
-  const formData = new FormData()
-  formData.append('file', file.file || file)
-  formData.append('job_type', jobType.value)
-  
-  try {
-    const response = await axios.post('http://localhost:8000/api/resume/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    })
-
-    if (response.data.code === 200) {
-      resumePath.value = response.data.data.resume_path
-      message.success('简历上传成功')
-      
-      // 保存生成的问题
-      if (response.data.data.questions && response.data.data.questions.length > 0) {
-        interviewQuestions.value = response.data.data.questions
-        message.success('AI已生成面试问题')
-        
-        // 显示问题预览和确认对话框
-        showConfirmInterview()
-      } else {
-        message.error('生成面试问题失败')
-      }
-    }
-  } catch (error) {
-    console.error('上传错误详情:', {
-      status: error.response?.status,
-      data: error.response?.data,
-      headers: error.response?.headers,
-      error: error
-    })
-    
-    if (error.response?.status === 422) {
-      message.error('不支持的文件类型或文件格式错误：' + (error.response?.data?.detail || '仅支持txt、doc、docx、pdf、jpg、jpeg、png格式'))
-    } else {
-      message.error('简历上传失败：' + (error.response?.data?.detail || error.message))
-    }
-  } finally {
-    isProcessing.value = false
-  }
-}
-
-// 添加面试问题相关的状态
-const interviewQuestions = ref([])
-const currentQuestionIndex = ref(0)
-const isInterviewStarted = ref(false)
-
-// 显示问题预览和确认对话框
-function showConfirmInterview() {
-  const previewQuestions = interviewQuestions.value.slice(0, 3).map((q, i) => `${i + 1}. ${q}`).join('\n')
-  const totalQuestions = interviewQuestions.value.length
-  
-  addModal({
-    message: `AI已根据您的简历生成了${totalQuestions}个面试问题。以下是部分问题预览：\n\n${previewQuestions}\n\n是否开始模拟面试？`,
-    onConfirm: startInterview,
-    onCancel: () => {
-      message.info('您可以稍后点击"开始面试"按钮开始')
-    }
-  })
-}
-
-// 开始面试
-async function startInterview() {
-  try {
-    // 开启摄像头
-    await startCamera()
-    if (!isCameraActive.value) {
-      throw new Error('无法启动摄像头')
-    }
-    
-    // 设置面试状态
-    isInterviewStarted.value = true
-    currentQuestionIndex.value = 0
-    
-    // 显示第一个问题
-    showCurrentQuestion()
-    
-    // 自动开始录制
-    startAnswerRecording()
-  } catch (error) {
-    message.error('启动面试失败：' + error.message)
-  }
-}
-
-// 显示当前问题
-function showCurrentQuestion() {
-  if (currentQuestionIndex.value < interviewQuestions.value.length) {
-    const question = interviewQuestions.value[currentQuestionIndex.value]
-    currentQuestion.value = question
-  } else {
-    // 面试结束
-    isInterviewComplete.value = true
-    message.success('面试完成！')
-    stopAnswerRecording()
-    stopCamera()
-  }
-}
-
-// 处理下一个问题
-function nextQuestion() {
-  stopAnswerRecording()
-  currentQuestionIndex.value++
-  isAnswerComplete.value = false
-  showCurrentQuestion()
-  
-  // 如果还有问题，自动开始录制
-  if (!isInterviewComplete.value) {
-    startAnswerRecording()
-  }
-}
-
-// 获取第一个问题
-async function getFirstQuestion() {
-  try {
-    const response = await axios.post('/api/interview/next_question', {
-      resume_path: resumePath.value
-    })
-    if (response.data.code === 200) {
-      currentQuestion.value = response.data.data.question
-      isAnswerComplete.value = false
-      isInterviewComplete.value = response.data.data.completed
-    }
-  } catch (error) {
-    message.error('获取面试问题失败：' + (error.response?.data?.detail || error.message))
-    console.error('获取问题错误详情:', {
-      status: error.response?.status,
-      data: error.response?.data,
-      headers: error.response?.headers,
-      error: error
-    })
-  }
-}
-
-// 完成面试
-async function finishInterview() {
-  try {
-    const response = await axios.post('/api/interview/analyze', {
-      video_path: lastVideoPath.value,
-      resume_path: resumePath.value
-    })
-    if (response.data.code === 200) {
-      // 跳转到报告页面
-      router.push({
-        path: '/report',
-        query: {
-          report: JSON.stringify(response.data.data)
-        }
-      })
-    }
-  } catch (error) {
-    message.error('生成面试报告失败：' + (error.response?.data?.detail || error.message))
-    console.error(error)
-  }
-}
-
-const analysisProgress = ref('准备分析...')
-
-// 添加分析状态和进度更新函数
-async function startAnalysis() {
-  try {
-    analysisProgress.value = '正在分析视频...'
-    // 调用后端分析接口
-    const response = await axios.post('/api/analyze', {
-      videoPath: currentVideoPath.value,
-      jobType: jobType.value
-    })
-    
-    if (response.data.success) {
-      analysisProgress.value = '分析完成，正在生成报告...'
-      // 等待2秒后跳转到报告页面
-      setTimeout(() => {
-        router.push({
-          path: '/report',
-          query: { 
-            analysisId: response.data.analysisId,
-            jobType: jobType.value
-          }
-        })
-      }, 2000)
-    } else {
-      throw new Error(response.data.message || '分析失败')
-    }
-  } catch (error) {
-    console.error('分析出错:', error)
-    analysisProgress.value = '分析失败，请重试'
-  }
-}
-
-// 修改面试完成处理函数
-function handleInterviewComplete() {
-  isInterviewComplete.value = true
-  startAnalysis()
-}
 </script>
 
 <style scoped lang="scss">
@@ -938,110 +928,138 @@ function handleInterviewComplete() {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 480px;
-  min-height: 320px;
+  width: 680px;
+  min-height: 480px;
   z-index: 1000;
   background: white;
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
 
-.card-content {
-  padding: 24px;
-
-  h3 {
-    margin-bottom: 16px;
-    text-align: center;
-    font-size: 18px;
-    color: #262626;
-  }
-
-<<<<<<< HEAD
-.card {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 500px;
-  max-width: 90vw;
-  border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-
-  .card1 {
-    height: 200px;
+  .step1-card {
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    height: 100%;
+    gap: 16px;
 
-    .card-select {
-      display: block;
-      padding: 12px 16px;
-      margin: 4px 0;
-      border-radius: 6px;
-      transition: all 0.3s;
+    .card11 {
+      height: 120px;
+      overflow-y: auto;
 
-      &:hover {
-        background-color: #f5f5f5;
+      .n-card {
+        height: 100%;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+        &__content {
+          padding-top: 5px;
+        }
       }
     }
-  }
 
-  .card2 {
-    min-height: 400px;
-    width:auto;
-    display: flex;
-    flex-direction: column;
+    .card12 {
+      height: 270px;
+      overflow-y: auto;
 
-    .card-select2 {
-      display: block;
-      padding: 10px 12px;
+      .n-card {
+        height: 100%;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+        &__content {
+          padding-top: 5px;
+        }
+      }
+    }
+
+    .card11 .n-radio-group {
+      .n-space {
+        flex-direction: row !important;
+        /* 强制横向排列 */
+        flex-wrap: wrap;
+        /* 允许换行 */
+        gap: 8px;
+        /* 设置间距 */
+      }
+    }
+
+    .job_type {
+      padding: 10px 16px;
       margin: 4px 0;
       border-radius: 4px;
       transition: all 0.3s;
 
       &:hover {
-        background-color: #f0f7ff;
+        background-color: #f5f5f5;
       }
 
-      .secondary-selection {
-        margin-top: 16px;
+      &.n-radio--checked {
+        background-color: #e6f4ff;
+        color: #1890ff;
+      }
+    }
+
+    .jobs {
+      display: block;
+      padding: 8px 12px;
+      margin: 4px 0;
+      border: 1px solid #f0f0f0;
+      border-radius: 4px;
+      text-align: center;
+      transition: all 0.3s;
+
+      &:hover {
+        border-color: #d9d9d9;
       }
 
+      &.n-radio--checked {
+        border-color: #1890ff;
+        background-color: #e6f4ff;
+        color: #1890ff;
+      }
     }
   }
 
-  .cardButtons {
+  .step2-card {
+    text-align: center;
+    margin: 32px 0;
+    height:100%;
+    h2 {
+      margin-bottom: 16px;
+      font-size: 16px;
+      color: #262626;
+    }
+  }
+
+  .step3-card {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 16px;
+
+    h3 {
+      margin-bottom: 16px;
+      text-align: center;
+      font-size: 18px;
+      color: #262626;
+    }
+
+    h4 {
+      margin-bottom: 12px;
+      color: #595959;
+    }
+  }
+
+  .footer-buttons {
     display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-    padding-top: 24px;
-    margin-top: auto;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-top: 1px solid #f0f0f0;
+
+    .n-button {
+      min-width: 120px;
+      height: 40px;
+    }
   }
-}
-
-=======
-  h4 {
-    margin-bottom: 12px;
-    color: #595959;
-  }
-}
-
-.step-container {
-  text-align: center;
-  margin: 32px 0;
-
-  h2 {
-    margin-bottom: 16px;
-    font-size: 16px;
-    color: #262626;
-  }
-}
-
-.interview-container {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-top: 16px;
 }
 
 .video-section {
@@ -1137,5 +1155,5 @@ function handleInterviewComplete() {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
->>>>>>> 0ebcc382c58c30169c740ec104fa0e08286b48c2
+
 </style>

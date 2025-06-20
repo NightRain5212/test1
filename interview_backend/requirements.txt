@@ -52,3 +52,7 @@ eyeD3==0.9.8
 pydub==0.25.1
 whisper==1.0.0
 oss2==2.19.1
+jieba>=0.42.0
+websocket>=0.2.0
+mysql-connector-python>=9.3.0
+python-multipart>=0.0.20
