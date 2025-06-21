@@ -11,6 +11,14 @@
 ### 数据库
 - SQLite：轻量级关系型数据库
 
+## 报告映射
+<span style="color: red;">硬实力:</span>专业知识水平、解决问题能力
+<span style="color: red;">软实力:</span>团队合作能力、表达能力、行业认知
+<span style="color:red;">潜力:</span>创新能力、学习能力
+<span style="color:red;">文化水平:</span>伦理抉择、价值观
+<span style="color:red;">外部指标:</span>着装、行为举止、谈吐
+"
+
 ## 项目结构
 
 ```
