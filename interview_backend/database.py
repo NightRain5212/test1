@@ -9,8 +9,8 @@ class DatabaseManager:
     def __init__(self):
         """初始化数据库连接"""
         try:
-            self.conn = mysql.connector.connect(**DATABASE_CONFIG)
-            self.cursor = self.conn.cursor(dictionary=True)
+            self.connection = mysql.connector.connect(**DATABASE_CONFIG)
+            self.cursor = self.connection.cursor(dictionary=True)
             self._init_tables()
             print("数据库连接成功")
         except Exception as e:
@@ -44,7 +44,7 @@ class DatabaseManager:
                 )
             """)
 
-            self.conn.commit()
+            self.connection.commit()
             print("数据库表初始化完成")
 
         except Exception as e:
@@ -68,13 +68,13 @@ class DatabaseManager:
             )
 
             self.cursor.execute(query, values)
-            self.conn.commit()
+            self.connection.commit()
 
             return self.cursor.lastrowid
 
         except Exception as e:
             print(f"保存分析结果失败: {str(e)}")
-            self.conn.rollback()
+            self.connection.rollback()
             raise
 
     async def get_analysis_result(self, result_id: int) -> Optional[Dict[str, Any]]:
@@ -110,14 +110,14 @@ class DatabaseManager:
                     self.cursor = None  # 确保引用被清除
 
             # 关闭连接
-            if hasattr(self, 'conn') and self.conn is not None:
+            if hasattr(self, 'conn') and self.connection is not None:
                 try:
-                    if self.conn.is_connected():  # mysql-connector特有检查
-                        self.conn.close()
+                    if self.connection.is_connected():  # mysql-connector特有检查
+                        self.connection.close()
                 except Exception as e:
                     print(f"关闭连接失败: {str(e)}")
                 finally:
-                    self.conn = None  # 确保引用被清除
+                    self.connection = None  # 确保引用被清除
         except Exception as e:
             print(f"关闭数据库资源时发生意外错误: {str(e)}")
 
@@ -169,7 +169,7 @@ class DatabaseManager:
     def execute_query(self, query: str, params: Optional[tuple] = None) -> List[Dict]:
         """执行查询操作（安全参数化）"""
         try:
-            with self.connection.cursor() as cursor:
+            with self.connection.cursor(dictionary=True ) as cursor:
                 cursor.execute(query, params or ())
                 return cursor.fetchall()
         except mysql.connector.Error as e:
@@ -179,7 +179,7 @@ class DatabaseManager:
     def execute_update(self, query: str, params: Optional[tuple] = None) -> int:
         """执行更新操作（安全参数化）"""
         try:
-            with self.connection.cursor() as cursor:
+            with self.connection.cursor(dictionary=True) as cursor:
                 affected_rows = cursor.execute(query, params or ())
                 self.connection.commit()
                 return affected_rows

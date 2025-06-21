@@ -111,6 +111,14 @@ const level1Data = ['硬实力', '软实力', '潜力', '文化水平', '外部�
     value: sum
   };
 });
+const totalScore = ['硬实力', '软实力', '潜力', '文化水平', '外部指标'].reduce((sum, category) => {
+  const categoryData = level2Data[category] || [];
+  const categorySum = categoryData.reduce((catSum, item) => {
+    const weight = parseFloat(weight2[category].find(i => i.name === item.name).weight) / 100;
+    return catSum + (item.value * weight);
+  }, 0);
+  return sum + (categorySum * (parseFloat(weight1[category]) / 100));
+}, 0);
 
 // 菜单图标渲染:虚拟创建DOM
 function renderIcon(icon) {
@@ -164,12 +172,17 @@ const level2Color = {
 // 初始化雷达图
 const initRadarChart = () => {
   if (!radarChartContainer.value) return;
-  if(radarChartInstance){radarChartInstance.dispose();}
-  radarChartInstance = echarts.init(radarChartContainer.value);
+  if (radarChartInstance) { radarChartInstance.dispose(); }
+  radarChartInstance = echarts.init(radarChartContainer.value, null, {
+    renderer: 'canvas',
+    useCoarsePointer: true,
+    useDirtyRect: true,
+    passive: true  // 启用被动事件监听
+  });
   const option = {
     color: ['#67F9D8', '#FFE434', '#56A3F1', '#FF917C'],
     title: {
-      text: '能力评估雷达图',
+      text: '能力评估雷达图(总分:' + totalScore.toFixed(2) + '/100)',
       left: 'center',
       textStyle: {
         fontSize: 18,
@@ -248,13 +261,15 @@ const initPieChart = () => {
   }
 
   pieChartInstance = echarts.init(pieChartContainer.value, null, {
+    renderer: 'canvas',
     useCoarsePointer: true,
-    useDirtyRect: true
+    useDirtyRect: true,
+    passive: true  // 启用被动事件监听
   });
 
   const option = {
     title: {
-      text: '能力评估层级饼图',
+      text: '能力评估饼图(总分:' + totalScore.toFixed(2) + '/100)',
       left: 'center',
       top: 10
     },
@@ -408,9 +423,9 @@ const initPieChart = () => {
   };
 
   pieChartInstance.setOption(option);
-  
+
   // 添加窗口大小变化时的自适应
-  window.addEventListener('resize', function() {
+  window.addEventListener('resize', function () {
     pieChartInstance.resize();
   });
 };
@@ -420,8 +435,10 @@ const initBarChart = () => {
   barChartInstance?.dispose();
 
   barChartInstance = echarts.init(barChartContainer.value, null, {
+    renderer: 'canvas',
     useCoarsePointer: true,
-    useDirtyRect: true
+    useDirtyRect: true,
+    passive: true  // 启用被动事件监听
   });
 
   // 1. 重构数据结构为二维表
@@ -439,7 +456,7 @@ const initBarChart = () => {
   level1Data.forEach(mainItem => {
     const row = [mainItem.name];
     const subItems = level2Data[mainItem.name] || [];
-    
+
     // 填充每个子类的加权值
     subCategories.forEach(subName => {
       const subItem = subItems.find(item => item.name === subName);
@@ -450,7 +467,7 @@ const initBarChart = () => {
         row.push(0); // 无此子类填0
       }
     });
-    
+
     row.push(parseFloat(mainItem.weight)); // 添加大类权重
     datasetSource.push(row);
   });
@@ -537,6 +554,14 @@ const initBarChart = () => {
       padding: 10,
       textStyle: { color: '#fff' }
     },
+    title: {
+      text: '能力评估柱状图(总分:' + totalScore.toFixed(2) + '/100)',
+      left: 'center',
+      textStyle: {
+        fontSize: 18,
+        fontWeight: 'bold'
+      }
+    },
     legend: {
       data: Array.from(subCategories),
       bottom: 5,
@@ -569,14 +594,16 @@ const initBarChart = () => {
   barChartInstance.setOption(option);
   window.addEventListener('resize', () => barChartInstance.resize());
 };
-
+//初始化直方图
 const initHistogram = () => {
   if (!HistogramContainer.value) return;
   HistogramInstance?.dispose();
 
   HistogramInstance = echarts.init(HistogramContainer.value, null, {
+    renderer: 'canvas',
     useCoarsePointer: true,
-    useDirtyRect: true
+    useDirtyRect: true,
+    passive: true  // 启用被动事件监听
   });
 
   // 准备数据：将层级数据转换为直方图需要的格式
@@ -586,11 +613,11 @@ const initHistogram = () => {
   level1Data.forEach(mainItem => {
     const subItems = level2Data[mainItem.name] || [];
     const mainWeight = parseFloat(mainItem.weight) / 100; // 大类权重系数
-    
+
     subItems.forEach((subItem, subIndex) => {
       const subWeight = parseFloat(weight2[mainItem.name].find(w => w.name === subItem.name).weight) / 100;
       const width = mainWeight * subWeight; // 宽度 = 大类权重 × 小类权重
-      
+
       data.push({
         value: [
           currentX, // 起始位置
@@ -602,12 +629,20 @@ const initHistogram = () => {
           color: level2Color[mainItem.name]?.[subIndex] || '#999'
         }
       });
-      
+
       currentX += width * 100; // 更新x轴位置
     });
   });
 
   const option = {
+    title: {
+      text: '能力评估直方图(总分:' + totalScore.toFixed(2) + '/100)',
+      left: 'center',
+      textStyle: {
+        fontSize: 18,
+        fontWeight: 'bold'
+      }
+    },
     tooltip: {
       trigger: 'item',
       formatter: params => {
@@ -637,7 +672,7 @@ const initHistogram = () => {
         const start = api.coord([api.value(0), yValue]);
         const size = api.size([api.value(1) - api.value(0), yValue]);
         const style = api.style();
-        
+
         return {
           type: 'rect',
           shape: {
@@ -667,20 +702,23 @@ const initHistogram = () => {
   HistogramInstance.setOption(option);
   window.addEventListener('resize', () => HistogramInstance.resize());
 };
+//初始化磁盘图
 const initDiskChart = () => {
   if (!DiskContainer.value) return;
   DiskInstance?.dispose();
 
   DiskInstance = echarts.init(DiskContainer.value, null, {
+    renderer: 'canvas',
     useCoarsePointer: true,
-    useDirtyRect: true
+    useDirtyRect: true,
+    passive: true  // 启用被动事件监听
   });
 
   const treemapData = level1Data.map((mainItem, mainIndex) => {
     const children = level2Data[mainItem.name].map((subItem, subIndex) => {
       const weightObj = weight2[mainItem.name].find(w => w.name === subItem.name);
       const weightedValue = subItem.value * (parseFloat(weightObj.weight) / 100);
-      
+
       return {
         name: subItem.name,
         value: weightedValue,
@@ -706,10 +744,10 @@ const initDiskChart = () => {
 
   const option = {
     title: {
-      text: '能力评估分布',
+      text: '能力评估磁盘图(总分:' + totalScore.toFixed(2) + '/100)',
       left: 'center',
       textStyle: {
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: 'bold'
       }
     },
@@ -752,7 +790,7 @@ const initDiskChart = () => {
       visibleMin: 10,
       label: {
         show: true,
-        formatter: function(params) {
+        formatter: function (params) {
           // Only show labels for level2 items
           return params.treePathInfo.length > 1 ? params.name : '';
         }
@@ -792,24 +830,24 @@ const initDiskChart = () => {
 // 切换图表时的清理
 const handleChartChange = (key) => {
   if (selectChart.value === 'radar-chart') {
-    if(radarChartInstance){
+    if(radarChartInstance&&!radarChartInstance.isDisposed){
       radarChartInstance.dispose()
     }
   } else if(selectChart.value === 'pie-chart'){
-    if(pieChartInstance){
+    if(pieChartInstance&&!pieChartInstance.isDisposed){
       pieChartInstance.dispose()
     }
   }else if(selectChart.value === 'bar-chart'){
-    if(barChartInstance){
+    if(barChartInstance&&!barChartInstance.isDisposed){
       barChartInstance.dispose()
     }
   }
   else if(selectChart.value === 'histogram'){
-    if(HistogramInstance){
+    if(HistogramInstance&&!HistogramInstance.isDisposed){
       HistogramInstance.dispose()
     }
   }  else if(selectChart.value === 'disk-chart'){
-    if(DiskInstance){
+    if(DiskInstance&&!DiskInstance.isDisposed){
       DiskInstance.dispose()
     }
   }

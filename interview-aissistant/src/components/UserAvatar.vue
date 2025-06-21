@@ -9,7 +9,7 @@
     <input ref="fileInput" type="file" accept="image/*" style="display: none" @change="handleFileSelect" />
     <!-- 裁剪模态框 -->
     <n-modal v-model:show="showCropModal">
-        <n-card style="width: 300px">
+        <n-card style="width: 300px;height:500px">
             <template #header>裁剪头像</template>
             <div class="cropper-container">
                 <img ref="cropperImage" src="" alt="未选择图片！" />
