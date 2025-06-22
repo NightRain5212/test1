@@ -1,13 +1,14 @@
 import axios from 'axios';
+import { message } from 'ant-design-vue';
 
 // 根据环境变量切换基础URL
 // const BASE_URL = import.meta.env.DEV //vite提供的环境变量，判断是否是开发环境
 //   ? '/api' // 开发环境使用代理
 //   : import.meta.env.VITE_API_BASE_URL_PROD; // 生产环境用真实URL
-const BASE_URL ='/api' // /api前面的路径都会被删除,用于绕过浏览器限制
+const BASE_URL = '/api'; // /api前面的路径都会被删除,用于绕过浏览器限制
 const instance = axios.create({
   baseURL: BASE_URL,
-  timeout: 5000,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -30,48 +31,72 @@ export function isTokenExpired(token) {
       return true;
   }
 }
+
+// 请求拦截器
 instance.interceptors.request.use(
-  (config) => {
-    try {
-      // 从安全存储获取token（可根据环境替换为更安全的存储方式）
-      const access_token = localStorage.getItem('accessToken');
-      const refresh_token = localStorage.getItem('refreshToken');
-      
-      // 验证token格式有效性
-      const isValidToken = (token) => {
-        return token && typeof token === 'string' && token.trim().length > 0;
-      };
-
-      // 添加Authorization头
-      if (isValidToken(access_token)) {
-        config.headers.Authorization = `Bearer ${access_token.trim()}`;
-      }
-
-      // 添加RefreshToken头（根据后端需求决定是否发送）
-      if (isValidToken(refresh_token)) {
-        config.headers['X-Refresh-Token'] = refresh_token.trim(); // 建议使用X-前缀表示自定义头
-      }
-
-      return config;
-    } catch (error) {
-      console.error('请求拦截器处理失败:', error);
-      return Promise.reject(new Error('请求配置处理失败'));
+  config => {
+    // 从 localStorage 获取 token
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
+    return config;
   },
-  (error) => {
-    // 请求配置错误的统一处理
-    console.error('请求拦截器配置错误:', error);
+  error => {
+    console.error('请求错误：', error);
     return Promise.reject(error);
   }
 );
-//响应拦截器
+
+// 响应拦截器
 instance.interceptors.response.use(
-  (response) => {
-    return response.data;//直接返回响应tibody
+  response => {
+    const res = response.data;
+    // 如果返回的状态码不是200，说明出错了
+    if (res.code !== 200) {
+      message.error(res.message || '请求失败');
+      // 如果是401，说明token过期，需要重新登录
+      if (res.code === 401) {
+        // 清除token
+        localStorage.removeItem('token');
+        // 跳转到登录页
+        window.location.href = '/login';
+      }
+      return Promise.reject(new Error(res.message || '请求失败'));
+    }
+    return res;
   },
-  (error) => {
-    console.error('API Error:', error);
-    return Promise.reject(error.response?.data || error);
+  error => {
+    console.error('响应错误：', error);
+    // 处理网络错误
+    if (!error.response) {
+      message.error('网络错误，请检查您的网络连接');
+    }
+    // 处理HTTP错误
+    else {
+      const status = error.response.status;
+      switch (status) {
+        case 401:
+          message.error('未授权，请重新登录');
+          // 清除token
+          localStorage.removeItem('token');
+          // 跳转到登录页
+          window.location.href = '/login';
+          break;
+        case 403:
+          message.error('拒绝访问');
+          break;
+        case 404:
+          message.error('请求的资源不存在');
+          break;
+        case 500:
+          message.error('服务器错误');
+          break;
+        default:
+          message.error(`请求失败：${error.message}`);
+      }
+    }
+    return Promise.reject(error);
   }
 );
 

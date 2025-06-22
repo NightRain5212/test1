@@ -32,6 +32,7 @@ from config import (
     SPARK_CONFIG
 )
 from spark_client import SparkClient
+from analyzer.models.question_generator import QuestionGenerator
 
 # 创建实例化对象
 print(">>>>>>>>>>>>>>>>>>>>>加载对象实例<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
@@ -109,6 +110,27 @@ class NextQuestionRequest(BaseModel):
 class AnalyzeRequest(BaseModel):
     video_path: str
     resume_path: str
+
+# 社区相关的模型
+class PostCreate(BaseModel):
+    title: str
+    content: str
+    post_type: str
+    tags: Optional[str] = None
+
+class CommentCreate(BaseModel):
+    post_id: int
+    content: str
+
+class ResourceLinkCreate(BaseModel):
+    title: str
+    url: str
+    description: Optional[str] = None
+    category: str
+    tags: Optional[str] = None
+
+# 导入问题生成器
+question_generator = QuestionGenerator()
 
 # 传入刷新令牌，获取新的访问令牌access_token和刷新令牌refresh_token
 @app.post("/api/auth/refresh")
@@ -544,154 +566,469 @@ def allowed_file(filename):
 @app.post("/api/resume/upload")
 async def upload_resume(
     file: UploadFile = File(...),
-    job_type: str = Form(...)
+    job_type: str = Form(...),
+    user_id: int = Form(...)
 ):
-    """
-    上传简历并生成面试问题
-    """
-    print(f"接收到文件上传请求: filename={file.filename}, content_type={file.content_type}, job_type={job_type}")
-    
-    if not file:
-        raise HTTPException(status_code=400, detail="没有上传文件")
-    
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="文件名不能为空")
-    
-    if not allowed_file(file.filename):
-        print(f"不支持的文件类型: {file.filename}")
-        raise HTTPException(
-            status_code=422, 
-            detail=f"不支持的文件类型: {file.filename}，仅支持txt、doc、docx、pdf、jpg、jpeg、png格式"
-        )
-    
+    """上传简历并生成面试问题"""
     try:
-        # 生成唯一的文件名
-        file_extension = file.filename.rsplit('.', 1)[1].lower()
-        unique_filename = f"{uuid.uuid4().hex}.{file_extension}"
-        file_path = RESUME_DIR / unique_filename
-        
+        # 验证文件类型
+        if not allowed_file(file.filename):
+            raise HTTPException(status_code=400, detail="不支持的文件类型")
+
         # 保存文件
-        print(f"保存文件到: {file_path}")
-        with file_path.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        file_path = file_manager.save_file(file, "resumes")
         
-        # TODO: 如果是PDF或图片，需要进行OCR处理
-        # 这里暂时假设是文本文件
-        try:
-            resume_text = file_path.read_text(encoding='utf-8')
-            print("成功读取文件内容")
-        except UnicodeDecodeError:
-            print("非文本文件，跳过内容读取")
-            # 如果不是文本文件，返回文件路径供后续处理
-            resume_text = ""
+        # 提取简历内容
+        content = await file_manager.extract_resume_content(file_path)
+        
+        # 保存简历记录
+        resume_id = await db_manager.create_resume(
+            user_id=user_id,
+            file_path=file_path,
+            file_type=file.filename.split('.')[-1],
+            content=content
+        )
+        
+        # 创建面试记录
+        interview_id = await db_manager.create_interview_record(user_id, resume_id)
         
         # 生成面试问题
-        analyzer = InterviewAnalyzer()
-        questions = await analyzer.process_resume(resume_text, job_type)
+        questions = await question_generator.generate_questions(content, job_type)
+        
+        # 保存问题
+        for question in questions:
+            await db_manager.add_interview_question(interview_id, question)
         
         return {
             "code": 200,
             "data": {
-                "questions": questions,
-                "resume_path": str(file_path)
+                "resume_path": file_path,
+                "interview_id": interview_id,
+                "questions": questions
             }
         }
     except Exception as e:
-        print(f"文件上传处理错误: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"简历上传失败：{str(e)}")
+        print(f"上传简历失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/interview/next_question")
-async def get_next_question(request: NextQuestionRequest):
-    """
-    获取下一个面试问题
-    """
-    try:
-        analyzer = InterviewAnalyzer()
-        with open(request.resume_path, 'r', encoding='utf-8') as f:
-            resume_text = f.read()
-        
-        analyzer.resume_text = resume_text
-        question = analyzer.get_next_question()
-        
-        if not question:
-            return {
-                "code": 200,
-                "data": {
-                    "completed": True,
-                    "question": None
-                }
-            }
-        
-        return {
-            "code": 200,
-            "data": {
-                "completed": False,
-                "question": question
-            }
-        }
-    except Exception as e:
-        print(f"获取下一个问题失败: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"获取下一个问题失败：{str(e)}")
-
-@app.post("/api/analyze")
-async def analyze_interview(
-    video: Optional[UploadFile] = File(None),
-    audio: Optional[UploadFile] = File(None),
-    text: Optional[str] = Form(None)
+@app.post("/api/interview/save_answer")
+async def save_answer(
+    interview_id: int = Form(...),
+    question_id: int = Form(...),
+    answer_audio: UploadFile = File(...),
+    answer_text: str = Form(...)
 ):
-    """
-    分析面试表现
-    :param video: 视频文件
-    :param audio: 音频文件
-    :param text: 文本内容
-    :return: 分析结果
-    """
+    """保存面试答案"""
     try:
-        # 保存上传的文件
-        video_path = None
-        audio_path = None
+        # 保存音频文件
+        audio_path = file_manager.save_file(answer_audio, "answers")
         
-        if video:
-            video_path = await save_upload_file(video, "video")
-        if audio:
-            audio_path = await save_upload_file(audio, "audio")
-            
-        # 运行分析
-        result = await analyzer.run(
+        # 获取面试详情（用于获取职位类型）
+        interview = await db_manager.get_interview_details(interview_id)
+        if not interview:
+            raise HTTPException(status_code=404, detail="面试记录不存在")
+        
+        # 评估答案
+        question = next((q for q in interview['questions'] if q['id'] == question_id), None)
+        if not question:
+            raise HTTPException(status_code=404, detail="问题不存在")
+        
+        evaluation = await question_generator.evaluate_answer(
+            question['question'],
+            answer_text,
+            interview.get('job_type', '未知职位')
+        )
+        
+        # 更新问题记录
+        await db_manager.update_question_answer(
+            question_id=question_id,
+            answer_audio_path=audio_path,
+            answer_text=answer_text,
+            score=evaluation['score']
+        )
+        
+        return {
+            "code": 200,
+            "data": {
+                "evaluation": evaluation
+            }
+        }
+    except Exception as e:
+        print(f"保存答案失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/interview/complete")
+async def complete_interview(
+    interview_id: int = Form(...),
+    video_path: str = Form(...),
+    audio_path: str = Form(...)
+):
+    """完成面试并生成报告"""
+    try:
+        # 获取面试详情
+        interview = await db_manager.get_interview_details(interview_id)
+        if not interview:
+            raise HTTPException(status_code=404, detail="面试记录不存在")
+        
+        # 计算总分
+        questions = interview.get('questions', [])
+        if not questions:
+            raise HTTPException(status_code=400, detail="没有面试问题记录")
+        
+        total_score = sum(q.get('score', 0) for q in questions) / len(questions)
+        
+        # 生成评级
+        rating = question_generator.calculate_rating(total_score)
+        
+        # 生成报告
+        report_data = {
+            "interview_id": interview_id,
+            "total_score": total_score,
+            "rating": rating,
+            "questions": questions,
+            "resume_analysis": {
+                "file_path": interview['resume_path'],
+                "content": interview['resume_content']
+            }
+        }
+        
+        # 保存报告
+        report_path = f"reports/interview_{interview_id}_report.pdf"
+        await file_manager.generate_report(report_data, report_path)
+        
+        # 更新面试记录
+        await db_manager.complete_interview(
+            interview_id=interview_id,
             video_path=video_path,
             audio_path=audio_path,
-            text=text
+            report_path=report_path,
+            total_score=total_score,
+            rating=rating
         )
         
-        return result
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"分析过程出错: {str(e)}"
-        )
-
-@app.post("/api/video/upload")
-async def upload_video(file: UploadFile = File(...)):
-    """上传视频"""
-    try:
-        # 检查文件类型
-        if not file_manager.allowed_file(file.filename):
-            raise HTTPException(status_code=400, detail="不支持的文件类型")
-        
-        # 保存文件
-        file_path = await file_manager.save_file(file, "video")
-        
-        # 返回结果
         return {
-            "success": True,
+            "code": 200,
             "data": {
-                "file_path": file_path
+                "report_path": report_path,
+                "total_score": total_score,
+                "rating": rating
             }
         }
-        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"视频上传失败：{str(e)}")
+        print(f"完成面试失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/interview/history")
+async def get_interview_history(
+    user_id: int,
+    page: int = 1,
+    page_size: int = 10
+):
+    """获取面试历史记录"""
+    try:
+        offset = (page - 1) * page_size
+        records = await db_manager.get_interview_history(
+            user_id=user_id,
+            limit=page_size,
+            offset=offset
+        )
+        
+        return {
+            "code": 200,
+            "data": {
+                "records": records,
+                "page": page,
+                "page_size": page_size
+            }
+        }
+    except Exception as e:
+        print(f"获取历史记录失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/interview/detail/{interview_id}")
+async def get_interview_detail(interview_id: int):
+    """获取面试详细信息"""
+    try:
+        interview = await db_manager.get_interview_details(interview_id)
+        if not interview:
+            raise HTTPException(status_code=404, detail="面试记录不存在")
+        
+        return {
+            "code": 200,
+            "data": interview
+        }
+    except Exception as e:
+        print(f"获取面试详情失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 社区相关的API路由
+@app.post("/api/community/posts")
+async def create_post(post: PostCreate, user_id: int = Depends(get_current_user)):
+    """创建帖子"""
+    try:
+        query = """
+            INSERT INTO community_posts 
+            (user_id, title, content, post_type, tags)
+            VALUES (%s, %s, %s, %s, %s)
+        """
+        values = (user_id, post.title, post.content, post.post_type, post.tags)
+        
+        db_manager.cursor.execute(query, values)
+        db_manager.conn.commit()
+        post_id = db_manager.cursor.lastrowid
+        
+        return {
+            "code": 200,
+            "data": {
+                "post_id": post_id
+            }
+        }
+    except Exception as e:
+        print(f"创建帖子失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/community/posts")
+async def get_posts(
+    post_type: Optional[str] = None,
+    tags: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 10
+):
+    """获取帖子列表"""
+    try:
+        conditions = []
+        values = []
+        
+        if post_type:
+            conditions.append("post_type = %s")
+            values.append(post_type)
+        
+        if tags:
+            conditions.append("FIND_IN_SET(%s, tags)")
+            values.append(tags)
+        
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        
+        # 获取总数
+        count_query = f"SELECT COUNT(*) as total FROM community_posts WHERE {where_clause}"
+        db_manager.cursor.execute(count_query, tuple(values))
+        total = db_manager.cursor.fetchone()["total"]
+        
+        # 获取帖子列表
+        query = f"""
+            SELECT p.*, u.username
+            FROM community_posts p
+            JOIN users u ON p.user_id = u.id
+            WHERE {where_clause}
+            ORDER BY p.created_at DESC
+            LIMIT %s OFFSET %s
+        """
+        values.extend([page_size, (page - 1) * page_size])
+        
+        db_manager.cursor.execute(query, tuple(values))
+        posts = db_manager.cursor.fetchall()
+        
+        return {
+            "code": 200,
+            "data": {
+                "total": total,
+                "posts": posts,
+                "page": page,
+                "page_size": page_size
+            }
+        }
+    except Exception as e:
+        print(f"获取帖子列表失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/community/posts/{post_id}")
+async def get_post_detail(post_id: int):
+    """获取帖子详情"""
+    try:
+        # 更新浏览量
+        db_manager.cursor.execute(
+            "UPDATE community_posts SET views = views + 1 WHERE id = %s",
+            (post_id,)
+        )
+        
+        # 获取帖子信息
+        query = """
+            SELECT p.*, u.username
+            FROM community_posts p
+            JOIN users u ON p.user_id = u.id
+            WHERE p.id = %s
+        """
+        db_manager.cursor.execute(query, (post_id,))
+        post = db_manager.cursor.fetchone()
+        
+        if not post:
+            raise HTTPException(status_code=404, detail="帖子不存在")
+        
+        # 获取评论
+        comment_query = """
+            SELECT c.*, u.username
+            FROM post_comments c
+            JOIN users u ON c.user_id = u.id
+            WHERE c.post_id = %s
+            ORDER BY c.created_at DESC
+        """
+        db_manager.cursor.execute(comment_query, (post_id,))
+        comments = db_manager.cursor.fetchall()
+        
+        db_manager.conn.commit()
+        
+        return {
+            "code": 200,
+            "data": {
+                "post": post,
+                "comments": comments
+            }
+        }
+    except Exception as e:
+        print(f"获取帖子详情失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/community/comments")
+async def create_comment(comment: CommentCreate, user_id: int = Depends(get_current_user)):
+    """创建评论"""
+    try:
+        query = """
+            INSERT INTO post_comments 
+            (post_id, user_id, content)
+            VALUES (%s, %s, %s)
+        """
+        values = (comment.post_id, user_id, comment.content)
+        
+        db_manager.cursor.execute(query, values)
+        db_manager.conn.commit()
+        
+        return {
+            "code": 200,
+            "data": {
+                "comment_id": db_manager.cursor.lastrowid
+            }
+        }
+    except Exception as e:
+        print(f"创建评论失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/community/resources")
+async def create_resource_link(resource: ResourceLinkCreate):
+    """创建资源链接"""
+    try:
+        query = """
+            INSERT INTO resource_links 
+            (title, url, description, category, tags)
+            VALUES (%s, %s, %s, %s, %s)
+        """
+        values = (
+            resource.title,
+            resource.url,
+            resource.description,
+            resource.category,
+            resource.tags
+        )
+        
+        db_manager.cursor.execute(query, values)
+        db_manager.conn.commit()
+        
+        return {
+            "code": 200,
+            "data": {
+                "resource_id": db_manager.cursor.lastrowid
+            }
+        }
+    except Exception as e:
+        print(f"创建资源链接失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/community/resources")
+async def get_resource_links(
+    category: Optional[str] = None,
+    tags: Optional[str] = None
+):
+    """获取资源链接列表"""
+    try:
+        conditions = []
+        values = []
+        
+        if category:
+            conditions.append("category = %s")
+            values.append(category)
+        
+        if tags:
+            conditions.append("FIND_IN_SET(%s, tags)")
+            values.append(tags)
+        
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        
+        query = f"""
+            SELECT *
+            FROM resource_links
+            WHERE {where_clause}
+            ORDER BY clicks DESC, created_at DESC
+        """
+        
+        db_manager.cursor.execute(query, tuple(values))
+        resources = db_manager.cursor.fetchall()
+        
+        return {
+            "code": 200,
+            "data": {
+                "resources": resources
+            }
+        }
+    except Exception as e:
+        print(f"获取资源链接列表失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/community/resources/{resource_id}/click")
+async def record_resource_click(resource_id: int):
+    """记录资源点击"""
+    try:
+        query = "UPDATE resource_links SET clicks = clicks + 1 WHERE id = %s"
+        db_manager.cursor.execute(query, (resource_id,))
+        db_manager.conn.commit()
+        
+        return {
+            "code": 200,
+            "data": None
+        }
+    except Exception as e:
+        print(f"记录资源点击失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/community/posts/{post_id}/like")
+async def like_post(post_id: int, user_id: int = Depends(get_current_user)):
+    """点赞帖子"""
+    try:
+        query = "UPDATE community_posts SET likes = likes + 1 WHERE id = %s"
+        db_manager.cursor.execute(query, (post_id,))
+        db_manager.conn.commit()
+        
+        return {
+            "code": 200,
+            "data": None
+        }
+    except Exception as e:
+        print(f"点赞帖子失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/community/comments/{comment_id}/like")
+async def like_comment(comment_id: int, user_id: int = Depends(get_current_user)):
+    """点赞评论"""
+    try:
+        query = "UPDATE post_comments SET likes = likes + 1 WHERE id = %s"
+        db_manager.cursor.execute(query, (comment_id,))
+        db_manager.conn.commit()
+        
+        return {
+            "code": 200,
+            "data": None
+        }
+    except Exception as e:
+        print(f"点赞评论失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 def main():
     """主函数"""

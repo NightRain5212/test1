@@ -44,6 +44,96 @@ class DatabaseManager:
                 )
             """)
 
+            # 创建简历表
+            self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS resumes (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    file_path VARCHAR(255) NOT NULL,
+                    file_type VARCHAR(50) NOT NULL,
+                    content TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+            """)
+
+            # 创建面试记录表
+            self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS interview_records (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    resume_id INT NOT NULL,
+                    video_path VARCHAR(255),
+                    audio_path VARCHAR(255),
+                    report_path VARCHAR(255),
+                    total_score DECIMAL(5,2),
+                    rating ENUM('优秀', '良好', '中等', '待提高') NOT NULL,
+                    is_completed BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id),
+                    FOREIGN KEY (resume_id) REFERENCES resumes(id)
+                )
+            """)
+
+            # 创建面试问题表
+            self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS interview_questions (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    interview_id INT NOT NULL,
+                    question TEXT NOT NULL,
+                    answer_audio_path VARCHAR(255),
+                    answer_text TEXT,
+                    score DECIMAL(5,2),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (interview_id) REFERENCES interview_records(id)
+                )
+            """)
+
+            # 创建社区帖子表
+            self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS community_posts (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    title VARCHAR(255) NOT NULL,
+                    content TEXT NOT NULL,
+                    post_type ENUM('面试题', '实时面试', '经验分享', '资源分享') NOT NULL,
+                    tags VARCHAR(255),
+                    views INT DEFAULT 0,
+                    likes INT DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+            """)
+
+            # 创建帖子评论表
+            self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS post_comments (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    post_id INT NOT NULL,
+                    user_id INT NOT NULL,
+                    content TEXT NOT NULL,
+                    likes INT DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (post_id) REFERENCES community_posts(id),
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+            """)
+
+            # 创建资源链接表
+            self.cursor.execute("""
+                CREATE TABLE IF NOT EXISTS resource_links (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    title VARCHAR(255) NOT NULL,
+                    url VARCHAR(512) NOT NULL,
+                    description TEXT,
+                    category VARCHAR(50) NOT NULL,
+                    tags VARCHAR(255),
+                    clicks INT DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
             self.conn.commit()
             print("数据库表初始化完成")
 
@@ -244,6 +334,144 @@ class DatabaseManager:
         where_clause, params = self._build_where_clause(conditions)
         query = f"DELETE FROM {table} WHERE {where_clause}"
         return self.execute_update(query, params)
+
+    # 面试相关的方法
+    async def create_resume(self, user_id: int, file_path: str, file_type: str, content: str = None) -> int:
+        """创建简历记录"""
+        try:
+            query = """
+                INSERT INTO resumes (user_id, file_path, file_type, content)
+                VALUES (%s, %s, %s, %s)
+            """
+            values = (user_id, file_path, file_type, content)
+            self.cursor.execute(query, values)
+            self.conn.commit()
+            return self.cursor.lastrowid
+        except Exception as e:
+            print(f"创建简历记录失败: {str(e)}")
+            self.conn.rollback()
+            raise
+
+    async def create_interview_record(self, user_id: int, resume_id: int) -> int:
+        """创建面试记录"""
+        try:
+            query = """
+                INSERT INTO interview_records (user_id, resume_id, rating)
+                VALUES (%s, %s, '待提高')
+            """
+            values = (user_id, resume_id)
+            self.cursor.execute(query, values)
+            self.conn.commit()
+            return self.cursor.lastrowid
+        except Exception as e:
+            print(f"创建面试记录失败: {str(e)}")
+            self.conn.rollback()
+            raise
+
+    async def add_interview_question(self, interview_id: int, question: str) -> int:
+        """添加面试问题"""
+        try:
+            query = """
+                INSERT INTO interview_questions (interview_id, question)
+                VALUES (%s, %s)
+            """
+            values = (interview_id, question)
+            self.cursor.execute(query, values)
+            self.conn.commit()
+            return self.cursor.lastrowid
+        except Exception as e:
+            print(f"添加面试问题失败: {str(e)}")
+            self.conn.rollback()
+            raise
+
+    async def update_question_answer(self, question_id: int, answer_audio_path: str, answer_text: str, score: float) -> None:
+        """更新问题的答案"""
+        try:
+            query = """
+                UPDATE interview_questions
+                SET answer_audio_path = %s, answer_text = %s, score = %s
+                WHERE id = %s
+            """
+            values = (answer_audio_path, answer_text, score, question_id)
+            self.cursor.execute(query, values)
+            self.conn.commit()
+        except Exception as e:
+            print(f"更新问题答案失败: {str(e)}")
+            self.conn.rollback()
+            raise
+
+    async def complete_interview(self, interview_id: int, video_path: str, audio_path: str, 
+                               report_path: str, total_score: float, rating: str) -> None:
+        """完成面试记录"""
+        try:
+            query = """
+                UPDATE interview_records
+                SET video_path = %s, audio_path = %s, report_path = %s, 
+                    total_score = %s, rating = %s, is_completed = TRUE
+                WHERE id = %s
+            """
+            values = (video_path, audio_path, report_path, total_score, rating, interview_id)
+            self.cursor.execute(query, values)
+            self.conn.commit()
+        except Exception as e:
+            print(f"完成面试记录失败: {str(e)}")
+            self.conn.rollback()
+            raise
+
+    async def get_interview_history(self, user_id: int, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
+        """获取用户的面试历史记录"""
+        try:
+            query = """
+                SELECT ir.*, r.file_path as resume_path, r.file_type as resume_type
+                FROM interview_records ir
+                JOIN resumes r ON ir.resume_id = r.id
+                WHERE ir.user_id = %s AND ir.is_completed = TRUE
+                ORDER BY ir.created_at DESC
+                LIMIT %s OFFSET %s
+            """
+            self.cursor.execute(query, (user_id, limit, offset))
+            return self.cursor.fetchall()
+        except Exception as e:
+            print(f"获取面试历史记录失败: {str(e)}")
+            raise
+
+    async def get_interview_questions(self, interview_id: int) -> List[Dict[str, Any]]:
+        """获取面试的所有问题"""
+        try:
+            query = """
+                SELECT *
+                FROM interview_questions
+                WHERE interview_id = %s
+                ORDER BY created_at ASC
+            """
+            self.cursor.execute(query, (interview_id,))
+            return self.cursor.fetchall()
+        except Exception as e:
+            print(f"获取面试问题失败: {str(e)}")
+            raise
+
+    async def get_interview_details(self, interview_id: int) -> Dict[str, Any]:
+        """获取面试详细信息"""
+        try:
+            query = """
+                SELECT ir.*, r.file_path as resume_path, r.file_type as resume_type,
+                       r.content as resume_content
+                FROM interview_records ir
+                JOIN resumes r ON ir.resume_id = r.id
+                WHERE ir.id = %s
+            """
+            self.cursor.execute(query, (interview_id,))
+            interview = self.cursor.fetchone()
+            
+            if interview:
+                # 获取该面试的所有问题
+                questions = await self.get_interview_questions(interview_id)
+                interview['questions'] = questions
+                
+            return interview
+        except Exception as e:
+            print(f"获取面试详细信息失败: {str(e)}")
+            raise
 
 # 创建单例实例
 db_manager = DatabaseManager()
