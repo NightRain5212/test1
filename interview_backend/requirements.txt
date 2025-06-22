@@ -51,8 +51,14 @@ accelerate>=0.27.0
 eyeD3==0.9.8
 pydub==0.25.1
 whisper==1.0.0
-oss2==2.19.1
 jieba>=0.42.0
 websocket>=0.2.0
 mysql-connector-python>=9.3.0
 python-multipart>=0.0.20
+oss2>=2.15.0
+PyPDF2>=3.0.1
+python-docx>=0.8.11
+pytesseract>=0.3.8
+Pillow>=10.0.0
+reportlab>=4.0.0
+aiofiles>=23.0.0

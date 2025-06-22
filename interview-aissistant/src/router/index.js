@@ -4,6 +4,8 @@ import ReportView from '../views/ReportView.vue'
 import MyProfile from '../views/MyProfile.vue'
 import HistoryView from '../views/HistoryView.vue'
 import Login from '../views/Login.vue'  // 直接导入Login组件
+import Community from '../views/Community.vue'
+import PostDetail from '../views/PostDetail.vue'
 
 const routes = [
   {
@@ -28,8 +30,13 @@ const routes = [
   {
     path: '/community',
     name: 'community',//命名，home就可以代指url路径了
-    component: () => import('../views/Community.vue'),
+    component: Community,
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/community/post/:id',
+    name: 'post-detail',
+    component: PostDetail
   },
   {
     path: '/login',
