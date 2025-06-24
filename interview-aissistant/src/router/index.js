@@ -54,7 +54,7 @@ const routes = [
     path: '/myProfile',
     name: 'profile',
     component: MyProfile,
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: false }
   },
   {
     path: '/about',
@@ -90,7 +90,7 @@ router.beforeEach((to, from, next) => {
       path: '/login',
       query: { 
         redirect: to.fullPath,
-        showLogin: 'true'
+        showLogin: 'false'
       }
     });
     return;

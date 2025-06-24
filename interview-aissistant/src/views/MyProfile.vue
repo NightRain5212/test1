@@ -127,7 +127,8 @@ import rules from '../utils/rules'
 
 const store = useStore();
 const router = useRouter();
-const isLoggedIn = computed(() => store.isLoggedIn);
+//const isLoggedIn = computed(() => store.isLoggedIn);
+const isLoggedIn=ref(true);
 
 // 如果已登录，获取用户信息
 const userInfo = ref(store.getUser())

@@ -103,11 +103,11 @@
           </a-upload>
           <a-button type="default" @click="showResumeEditor = true">没有简历？在线编辑</a-button>
 
-          <!-- 简历编辑器弹窗 -->
-          <a-modal v-model:visible="showResumeEditor" title="在线简历编辑" width="800px" :footer="null">
-            <ResumeEditor @submit="handleResumeEditSubmit" />
-          </a-modal>
         </div>
+          <!-- 简历编辑器弹窗 -->
+          <div v-if="showResumeEditor"  width="1200px" :footer="null">
+            <ResumeEditor @submit="handleResumeEditSubmit" />
+          </div>
         <template v-if="step === 2" #footer>
           <div class="footer-buttons">
             <a-button type="default" @click="step = 1">上一步</a-button>

@@ -3,7 +3,7 @@ import App from './App.vue'
 import Antd from 'ant-design-vue'
 import { createPinia } from 'pinia'
 import router from './router'//router是一个文件夹
-import 'ant-design-vue/dist/reset.css' // 引入ant-design-vue的全局样式
+import 'ant-design-vue/dist/reset.css' 
 import naive from 'naive-ui'
 
 const app = createApp(App)

@@ -10,6 +10,7 @@ import json
 # 添加项目根目录到Python路径
 current_dir = Path(__file__).parent
 sys.path.append(str(current_dir))
+sys.path.append(str(Path(__file__).parent))
 
 from fastapi import FastAPI, HTTPException, Request, status, UploadFile, File, Form, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -745,6 +746,8 @@ async def get_interview_history(
         print(f"获取历史记录失败: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+def get_current_user():
+    pass
 @app.get("/api/interview/detail/{interview_id}")
 async def get_interview_detail(interview_id: int):
     """获取面试详细信息"""

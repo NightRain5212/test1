@@ -12,24 +12,28 @@
   },
   "dependencies": {
     "@ant-design/icons-vue": "^7.0.1",
-    "@tiptap/starter-kit": "^2.14.1",
-    "@tiptap/vue-3": "^2.14.1",
+    "@tiptap/starter-kit": "^2.22.3",
+    "@tiptap/vue-3": "^2.22.3",
     "@vicons/antd": "^0.13.0",
     "@vicons/carbon": "^0.13.0",
     "@vueuse/core": "^13.2.0",
-    "ant-design-vue": "4.0.0-rc.6",
+    "ant-design-vue": "^4.0.0-rc.6",
     "axios": "^1.9.0",
     "cropperjs": "^2.0.0",
     "docx": "^9.5.1",
     "echarts": "^5.6.0",
     "echarts-gl": "^2.0.9",
+    "element-plus": "^2.10.2",
+    "html2canvas": "^1.4.1",
     "jspdf": "^3.0.1",
     "loglevel": "^1.9.2",
     "naive-ui": "^2.41.0",
     "pinia": "^3.0.2",
-    "vue": "^3.5.13",
+    "vue": "^3.5.17",
     "vue-cropper": "^0.6.5",
-    "vue-router": "^4.5.1"
+    "vue-cropperjs": "^5.0.0",
+    "vue-router": "^4.5.1",
+    "vuedraggable": "^4.1.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
@@ -46,4 +50,5 @@
     "vite": "^6.3.3",
     "vite-plugin-inspect": "^0.8.1",
     "vite-plugin-vue-devtools": "^7.0.0"
-  }}
+  }
+}

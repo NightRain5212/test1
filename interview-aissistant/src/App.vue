@@ -165,7 +165,7 @@ onUnmounted(() => {
 }
 
 .right-main-content {
-  overflow: auto;
+  overflow:true;
   height: 100%;
   flex:1;//这里是指占据剩余的空间
 }

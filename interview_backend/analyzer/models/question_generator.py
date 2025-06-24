@@ -1,7 +1,8 @@
 import json
 from typing import List, Dict, Any
-from ...spark_client import SparkClient
-
+#from ...spark_client import SparkClient
+#from ..spark_client import SparkClient
+from interview_backend.spark_client import SparkClient
 class QuestionGenerator:
     def __init__(self):
         self.spark_client = SparkClient()

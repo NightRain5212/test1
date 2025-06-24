@@ -1,176 +1,222 @@
 <template>
-    <!-- 头像展示（点击触发文件选择） -->
-    <n-avatar round :size="72" :src="avatarUrl" class="user-avatar" @click="triggerFileInput">
-        <!-- <template #default v-if="!avatarUrl">
-            <UserOutlined style="font-size: 72px;" />
-        </template> -->
+  <div class="avatar-wrapper" @mouseenter="showCamera = true" @mouseleave="showCamera = false">
+    <n-avatar :round="true" :src="imageSrc" :size="100" color="white" @click="fileInput?.click()">
+      <template v-if="!imageSrc">
+        <div class="camera-hint">
+          <i style="width:20px;height:20px">
+            <camera_outline />
+          </i>
+          <span> 点击上传头像</span>
+        </div>
+      </template>
     </n-avatar>
-
-    <input ref="fileInput" type="file" accept="image/*" style="display: none" @change="handleFileSelect" />
-    <!-- 裁剪模态框 -->
-    <n-modal v-model:show="showCropModal">
-        <n-card style="width: 300px;height:500px">
-            <template #header>裁剪头像</template>
-            <div class="cropper-container">
-                <img ref="cropperImage" src="" alt="未选择图片！" />
-            </div>
-            <template #footer>
-                <n-space justify="end">
-                    <n-button @click="showCropModal = false">取消</n-button>
-                    <n-button type="primary" @click="confirmCrop">确认</n-button>
-                </n-space>
-            </template>
-        </n-card>
-    </n-modal>
+    <input ref="fileInput" type="file" @change="handleChange" style="display: none" accept="image/*">
+  </div>
+  <!-- 2.一个用于给Cropper.js覆盖使用的img  -->
+  <div class="cropper-container" v-if="show_cropper">
+    <img id="cropImg" :src="cropSrc" class="cropper-box" ref="croppers">
+    <div class="cropper-buttons">
+      <n-button @click="confirm_cropper" type="primary">确定</n-button>
+      <n-button @click="cancel_cropper" type="error">取消</n-button>
+    </div>
+  </div>
 </template>
 <script setup>
-import { ref, onMounted, onUnmounted,nextTick,watch } from 'vue';
-import {UserOutlined} from '@ant-design/icons-vue';
-import { message } from 'ant-design-vue'
-import {NAvatar,NButton,NModal,NCard,NSpace} from 'naive-ui'
-import Cropper from 'cropperjs';
-import { useStore } from '../store';
-const store = useStore();
-const fileInput = ref(null);
-const cropperImage = ref(null);
-const avatarUrl = ref('');
-//const avatarUrl=store.getUser().avatarSrc;
-const showCropModal = ref(false);
-let cropper = null;
+// import Cropper from 'cropperjs';
+import {
+  CropperCanvas, CropperImage, CropperHandle, CropperSelection, CropperGrid,
+  CropperShade,
+  CROPPER_CROSSHAIR
+} from 'cropperjs';
+import { ref,reactive, nextTick,onUnmounted } from 'vue'
+import {NAvatar,NIcon}from 'naive-ui'
+import { CameraOutline as camera_outline} from '@vicons/ionicons5';
+import {message}from 'ant-design-vue'
+import Cropper from "vue-cropperjs";
+const fileInput = ref(null); // 获取 input 的 DOM
+const imageSrc = ref('')//头像的图片数据
+const cropSrc = ref('')//待裁剪的cropper图片数据
+const show_cropper = ref(false)
+const croppers = ref(null)
+//裁剪区设置
+const MAX_WIDTH = 400;
+const MAX_HEIGHT = 400;
 
-// 触发文件选择
-const triggerFileInput = () => {
-  fileInput.value.click();//html的input标签内置方法，点击后触发文件选择
-};
-
-// 选择文件后显示裁剪框
-const handleFileSelect = (e) =>{
-    const file = e.target.files[0];
+let CROPPER =null;//cropper实例
+const handleChange = (e) => {
+  const file = e.target.files[0];
   if (!file) return;
 
+  // 将图片转为 base64 并显示
   const reader = new FileReader();
   reader.onload = (event) => {
-    showCropModal.value = true;//展示裁剪框
-    nextTick(() => {
-      initCropper(event.target.result);//初始化裁剪器
-    });
+    const rawimg = new Image(); // 创建临时Image对象
+    rawimg.src = event.target.result;
+    nextTick();
+    imageSrc.value = event.target.result;
+    return;
+    rawimg.onload = async() => {
+      console.log('原始图片加载完毕')
+      // 等比缩放
+
+      let width = rawimg.width;
+      let height = rawimg.height;
+
+        const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
+        width *= ratio;
+        height *= ratio;
+        console.log('width:', width, 'height:', height)
+
+      // 创建缩放后的Canvas
+      const tmp_canvas = document.createElement('canvas');
+      tmp_canvas.width = width;
+      tmp_canvas.height = height;
+      const ctx = tmp_canvas.getContext('2d');
+      ctx.drawImage(rawimg, 0, 0, width, height);
+
+      // 将缩放后的图片传给Cropper
+      show_cropper.value = true
+      cropSrc.value = tmp_canvas.toDataURL('image/jpeg', 0.9);
+      imageSrc.value = cropSrc.src
+      await nextTick();//等待dom更新
+      console.log('图片缩放完毕:', cropSrc.value)
+
+      if (CROPPER) {
+        CROPPER=null
+        console.log('销毁Cropper')
+      }
+
+        if (!croppers.value) {
+          console.error('未找到 cropImg 元素');
+          return;
+        }
+        CROPPER = new Cropper(croppers.value, {
+          aspectRatio: 16 / 16,      // 裁剪框的宽高比（1:1的正方形）
+          viewMode: 0,              // 视图模式（0：无限制）
+          minContainerWidth: width,   // 容器最小宽度
+          minContainerHeight: height,  // 容器最小高度
+          dragMode: 'move',         // 拖拽模式（移动画布）
+        });
+      
+    };//原始图片加载完成之后的回调函数
   };
   reader.readAsDataURL(file);
+};
+function confirm_cropper() {
+  //getCroppedCanvas方法可以将裁剪区域的数据转换成canvas数据
+  const canvas = CROPPER.getCropperCanvas({
+    maxWidth: 100,
+    maxHeight: 100,
+    fillColor: '#fff',
+    imageSmoothingEnabled: true,
+    imageSmoothingQuality: 'high'
+  });
+
+  // 直接获取 Base64 字符串
+  const base64Data = canvas.toDataURL('image/jpeg', 0.9); // 第二个参数是质量（0-1）
+  console.log('裁剪之后的Base64数据:', base64Data);
+  nextTick();
+  imageSrc.value = base64Data;
+  show_cropper.value = false
+  message.success('上传成功')
+  // CROPPER.getCroppedCanvas({
+  //   maxWidth: 100,
+  //   maxHeight: 100,
+  //   fillColor: '#fff',
+  //   imageSmoothingEnabled: true,
+  //   imageSmoothingQuality: 'high',
+  // }).toBlob((blob) => {
+  //然后调用浏览器原生的toBlob方法将canvas数据转换成blob数据
+  //之后就可以愉快的将blob数据发送至后端啦，可根据自己情况进行发送，我这里用的是axios
+  //const formData = new FormData();
+  // 第三个参数为文件名，可选填.
+  // formData.append('croppedImage', blob/*, 'example.png' */);
+  // let config = {
+  //   headers: { 'Content-Type': 'multipart/form-data' }
+  // }
+
+  // this.$axios.post(flow_mission_UploadFile(), param, config)
+  //   .then((response) => {
+  //     console.log(response)
+  //   })
+  //   .catch((err) => {
+  //     console.log(err)
+  //   })
+  //})
 }
-
-// 初始化裁剪器
-const initCropper = async (imageSrc) => {
-  try {
-    // 确保目标元素存在且已挂载
-    await nextTick();
-    if (!cropperImage.value) {
-      throw new Error('Cropper target element not found');
-    }
-
-    // 清理旧实例
-    if (cropper?.destroy) {
-      cropper.destroy();
-    }
-
-    // 初始化新实例
-    cropper = new Cropper(cropperImage.value, {
-      aspectRatio: 1,      // 裁剪框宽高比为1:1（正方形）
-      viewMode: 1,         // 限制裁剪框不超过画布边界
-      autoCropArea: 1,     // 初始裁剪区域占满整个图片
-      ready() {
-        console.log('Cropper ready'); // 初始化完成回调
-        cropper.replace(imageSrc);// 设置图片源（必须在初始化后）
-      }
-    });
-
-  } catch (err) {
-    console.error('Cropper init failed:', err);
-    message.error('图片加载失败');
+function cancel_cropper() {
+  if (CROPPER) {
+    CROPPER = null
+    console.log('销毁Cropper')
   }
-};
-
-// 确认裁剪
-const confirmCrop = () => {
-  try {
-    if (!cropper?.getCroppedCanvas) {
-      throw new Error('Cropper not initialized');
-    }
-
-    const canvas = cropper.getCroppedCanvas({
-      width: 200,
-      height: 200,
-      fillColor: '#fff'
-    });
-
-    if (!canvas) {
-      throw new Error('Canvas generation failed');
-    }
-
-    avatarUrl.value = canvas.toDataURL('image/png');
-    showCropModal.value = false;
-
-    console.log("上传头像:");
-    // 上传逻辑
-    canvas.toBlob(async (blob) => {
-      const formData = new FormData();
-      formData.append('image', blob, 'avatar.png');  // 关键修改：字段名必须是"image"
-
-      try {
-        const res = await axios.post('/upload', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data'  // 必须设置这个请求头
-          }
-        });
-        console.log('上传成功', res.data);
-        store.state.userinfo.avatarUrl = res.data?.image_url?? '';
-        avatarUrl = res.data?.image_url?? '';
-        console.log('avatarUrl',store.state.userinfo.avatarUrl)
-        a
-      } catch (error) {
-        console.error('上传失败:', error);
-      }
-    }, 'image/png', 0.9);
-  } catch (err) {
-    console.error('Crop failed:', err);
-  }
-};
-
-// 清理裁剪实例
+  show_cropper.value = false
+  nextTick();
+  imageSrc.value = '';
+  console.log('imageSrc:', imageSrc.value)
+}
+// 组件卸载时清理
 onUnmounted(() => {
-  if (cropper?.destroy) {
-    cropper.destroy();
-    cropper = null;
-  }
-});
-
-// 模态框关闭时清理
-watch(showCropModal, (val) => {
-  if (!val && cropper?.destroy) {
-    cropper.destroy();
-    cropper = null;
+  if (CROPPER) {
+    CROPPER = null
+    console.log('销毁Cropper')
   }
 });
 </script>
-
 <style scoped lang="scss">
-//裁剪框样式
-.cropper-container {
-  width: 100%;
-  height: 200px;
-  overflow: hidden;
-}
-
-.cropper-container img {
-  display: block;
-  max-width: 100%;
-  touch-action: none; /* 移动端必需 */
-}
-//用户头像区
-.user-avatar {
+.avatar-wrapper {
+  display: inline-block;
+  position: relative;
   cursor: pointer;
-  transition: opacity 0.3s;
+
   &:hover {
-    opacity: 0.8;
+    .camera-hint {
+      opacity: 1;
+    }
+  }
+
+  .camera-hint {
+    position: absolute;
+    top: 50%;
+    left: 30%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: rgb(203, 39, 39);
+    opacity: 0;
+    transition: opacity 0.3s;
+
+    span {
+      font-size: 12px;
+      margin-top: 0px;
+    }
+  }
+}
+.cropper-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  /* 关键：基于自身宽高回退50% */
+  z-index: 1000;
+  width: 400px;
+  height: 500px;
+  //background: white;
+  overflow: hidden;
+
+  .cropper-box {
+    width: 100%;
+  }
+
+  .cropper-buttons {
+    position: relative;
+    height: 60px;
+    width: 100%;
+    bottom: 0;
+    margin-top: 10px;
+    display: flex;
+    justify-content: space-around;
+    border-top: 1px solid #f0f0f0;
   }
 }
 </style>
