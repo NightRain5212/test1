@@ -1,7 +1,6 @@
 <template>
   <div class="charts-container">
     <div class="charts">
-      <!-- 使用v-show替代v-if保持DOM不销毁 -->
       <div v-if="selectChart === 'radar-chart'" ref="radarChartContainer" style="width: 100%; height: 100%;"></div>
       <div v-else-if="selectChart === 'pie-chart'" ref="pieChartContainer" style="width: 100%; height: 100%;"></div>
       <div v-else-if="selectChart === 'bar-chart'" ref="barChartContainer" style="width: 100%; height: 100%;"></div>

@@ -225,27 +225,27 @@ const jobTypeOptions = [
 
 const jobsOptions = {
   development: [
-    { value: 'frontend', label: '前端开发' },
-    { value: 'backend', label: '后端开发' },
-    { value: 'fullstack', label: '全栈开发' },
-    { value: 'embedded', label: '嵌入式开发' },
-    { value: 'desktop', label: 'C++桌面开发' },
-    { value: 'mobile', label: '移动端开发' },
-    { value: 'game', label: '游戏开发' }
+    { value: 'web前端开发', label: 'web前端开发' },
+    { value: 'web后端开发', label: 'web后端开发' },
+    { value: 'web全栈开发', label: 'web全栈开发' },
+    { value: '嵌入式开发', label: '嵌入式开发' },
+    { value: 'C++桌面开发', label: 'C++桌面开发' },
+    { value: '移动端开发', label: '移动端开发' },
+    { value: '游戏开发', label: '游戏开发' }
   ],
   research: [
-    { value: 'system-arch', label: '计算机系统结构' }
+    { value: '计算机系统结构', label: '计算机系统结构' }
   ],
   technical: [
-    { value: 'algorithm', label: '算法工程师' },
-    { value: 'data-analysis', label: '数据分析与挖掘' }
+    { value: '算法工程师', label: '算法工程师' },
+    { value: '数据分析与挖掘', label: '数据分析与挖掘' }
   ],
   design: [
-    { value: 'uix', label: 'UI/UX设计师' },
-    { value: 'effect', label: '特效设计师' }
+    { value: 'UI/UX设计师', label: 'UI/UX设计师' },
+    { value: '特效设计师', label: '特效设计师' }
   ],
   testing: [
-    { value: 'qa', label: '软件测试工程师' },
+    { value: '软件测试工程师', label: '软件测试工程师' },
   ]
 }
 
@@ -271,29 +271,29 @@ const currentVideoPath = ref('')
 // 添加处理状态
 const isProcessing = ref(false)
 
-// 修改文件上传处理函数
+// 这里上传简历文件并获取分析结果(暂时不保存简历文件到库)
 async function handleResumeUpload({ file }) {
   console.log('开始上传文件:', file.name, file.type)
   isProcessing.value = true
   
   const formData = new FormData()
   formData.append('file', file.file || file)
-  formData.append('job_type', jobSelection.value)
+  formData.append('job', jobSelection.value)
+  formData.append('user_id', localStorage.getItem('id'))
   
   try {
-    const response = await axios.post('resume/upload', formData, {
+    const response = await axios.post('/api/resume/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
     })
 
     if (response.data.code === 200) {
-      resumePath.value = response.data.data.resume_path
-      message.success('简历上传成功')
-      
+      message.success('上传成功')
+      console.log("上传成功！",response.data)
       // 保存生成的问题
       if (response.data.data.questions && response.data.data.questions.length > 0) {
-        interviewQuestions.value = response.data.data.questions
+        interviewQuestions.value = response.data.questions
         message.success('AI已生成面试问题')
         
         // 显示问题预览和确认对话框
@@ -310,10 +310,10 @@ async function handleResumeUpload({ file }) {
       error: error
     })
     
-    if (error.response?.status === 422) {
+    if (error.response?.status === 400) {
       message.error('不支持的文件类型或文件格式错误：' + (error.response?.data?.detail || '仅支持txt、doc、docx、pdf、jpg、jpeg、png格式'))
     } else {
-      message.error('简历上传失败：' + (error.response?.data?.detail || error.message))
+      message.error('上传失败：' + (error.response?.data?.detail || error.message))
     }
   } finally {
     isProcessing.value = false

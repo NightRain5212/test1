@@ -567,50 +567,47 @@ def allowed_file(filename):
 @app.post("/api/resume/upload")
 async def upload_resume(
     file: UploadFile = File(...),
-    job_type: str = Form(...),
+    job: str = Form(...),
     user_id: int = Form(...)
 ):
+    #这是参数形式，接收。前端以fromData形式进行传输
+    print("开始分析简历","目标岗位:",job,"用户Id:",user_id)
     """上传简历并生成面试问题"""
     try:
         # 验证文件类型
         if not allowed_file(file.filename):
             raise HTTPException(status_code=400, detail="不支持的文件类型")
-
-        # 保存文件
-        file_path = file_manager.save_file(file, "resumes")
         
         # 提取简历内容
-        content = await file_manager.extract_resume_content(file_path)
-        
-        # 保存简历记录
-        resume_id = await db_manager.create_resume(
-            user_id=user_id,
-            file_path=file_path,
-            file_type=file.filename.split('.')[-1],
-            content=content
-        )
-        
-        # 创建面试记录
-        interview_id = await db_manager.create_interview_record(user_id, resume_id)
+        content = await file_manager.extract_resume_content(file)
+
+        content=content+job
+        organized_content = await question_generator.organize_content(content, job)
+        print("成功提取简历内容:",organized_content)
+        # # 创建面试记录
+        # interview_id = await db_manager.create_interview_record(user_id, resume_id)
         
         # 生成面试问题
-        questions = await question_generator.generate_questions(content, job_type)
-        
-        # 保存问题
-        for question in questions:
-            await db_manager.add_interview_question(interview_id, question)
+        questions = await question_generator.generate_questions(organized_content)
+        print("生成问题成功:",questions)
+        # # 保存问题
+        # for question in questions:
+        #     await db_manager.add_interview_question(interview_id, question)
         
         return {
             "code": 200,
             "data": {
-                "resume_path": file_path,
-                "interview_id": interview_id,
+                "interview_id": 1,
                 "questions": questions
             }
         }
+    except HTTPException:
+        # 直接重新抛出，保留原始状态码和详情
+        raise
     except Exception as e:
+        # 仅处理非HTTPException的异常
         print(f"上传简历失败: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="服务器内部错误")
 
 @app.post("/api/interview/save_answer")
 async def save_answer(

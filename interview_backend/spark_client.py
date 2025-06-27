@@ -370,6 +370,7 @@ class SparkClient:
 
     async def chat(self, prompt):
         """调用星火大模型API进行对话"""
+        print("开始chat")
         # 如果配置不完整，使用本地生成方法
         if self._use_local:
             return self._local_generate(prompt)
@@ -385,7 +386,7 @@ class SparkClient:
                 async for response in websocket:
                     data = json.loads(response)
                     code = data["header"]["code"]
-                    
+                    print("请求:",prompt,"返回数据:",data)
                     if code != 0:
                         print(f"请求错误，错误码：{code}")
                         return self._local_generate(prompt)

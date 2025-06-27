@@ -23,7 +23,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib import colors
 from datetime import datetime
-
+from io import BytesIO
 class FileManager:
     def __init__(self, access_key_id: str, access_key_secret: str, bucket_name: str, endpoint: str):
         """
@@ -203,42 +203,56 @@ class FileManager:
             print(f"保存文件失败: {str(e)}")
             raise
 
-    async def extract_resume_content(self, file_path: str) -> str:
-        """从不同格式的简历文件中提取文本内容"""
+    async def extract_resume_content(self, file: UploadFile):
+        """从不同格式的简历文件中提取文本内容（支持UploadFile对象）"""
         try:
-            file_path = Path(file_path)
-            ext = file_path.suffix.lower()
-            
+            # 获取文件扩展名（确保正确处理带点的后缀）
+            filename = file.filename
+            ext = filename[filename.rfind('.'):].lower() if '.' in filename else ''
+            from io import BytesIO
             if ext == '.txt':
                 # 文本文件直接读取
-                return file_path.read_text(encoding='utf-8')
-            
+                content = (await file.read()).decode('utf-8')
+                await file.seek(0)  # 重置指针以便后续操作
+                return content
+
             elif ext == '.pdf':
-                # PDF文件
+                # PDF文件处理（使用PyPDF2）
                 content = []
-                with open(file_path, 'rb') as file:
-                    reader = PyPDF2.PdfReader(file)
+                pdf_data = await file.read()
+
+                # 使用BytesIO模拟文件对象
+                with BytesIO(pdf_data) as pdf_file:
+                    reader = PyPDF2.PdfReader(pdf_file)
                     for page in reader.pages:
-                        content.append(page.extract_text())
+                        text = page.extract_text()
+                        if text:  # 避免None
+                            content.append(text)
+
+                await file.seek(0)
                 return '\n'.join(content)
-            
+
             elif ext in ['.doc', '.docx']:
-                # Word文档
-                doc = Document(file_path)
-                return '\n'.join([paragraph.text for paragraph in doc.paragraphs])
-            
+                # Word文档处理（使用python-docx）
+                docx_data = await file.read()
+                doc = Document(BytesIO(docx_data))
+                await file.seek(0)
+                return '\n'.join([para.text for para in doc.paragraphs if para.text])
+
             elif ext in ['.png', '.jpg', '.jpeg']:
-                # 图片文件，使用OCR
-                image = Image.open(file_path)
+                # 图片OCR处理（需安装pytesseract和Pillow）
+                from PIL import Image
+                image_data = await file.read()
+                image = Image.open(BytesIO(image_data))
+                await file.seek(0)
                 return pytesseract.image_to_string(image, lang='chi_sim+eng')
-            
+
             else:
                 raise ValueError(f"不支持的文件类型: {ext}")
-                
+
         except Exception as e:
             print(f"提取简历内容失败: {str(e)}")
-            raise
-
+            raise ValueError(f"文件处理错误: {str(e)}")
     async def generate_report(self, report_data: dict, output_path: str) -> str:
         """生成面试报告PDF文件"""
         try:
