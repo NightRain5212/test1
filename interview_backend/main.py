@@ -65,9 +65,11 @@ OSS_ACCESS_KEY_SECRET = os.getenv("OSS_ACCESS_KEY_SECRET")
 
 # 创建全局对象实例
 print(">>>>>>>>>>>>>>>>>>>>>加载对象实例<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+spark=SparkClient()
 analyzer = InterviewAnalyzer()
 file_manager = FileManager(OSS_ACCESS_KEY_ID,OSS_ACCESS_KEY_SECRET,"interviewresource","https://cn.aliyun.com/")
 db_manager = DatabaseManager()
+question_generator = QuestionGenerator(spark)
 
 #analyzer.run("demo-video.mp4")#测试
 #analyzer.run()#测试
@@ -129,9 +131,6 @@ class ResourceLinkCreate(BaseModel):
     description: Optional[str] = None
     category: str
     tags: Optional[str] = None
-
-# 导入问题生成器
-question_generator = QuestionGenerator()
 
 # 传入刷新令牌，获取新的访问令牌access_token和刷新令牌refresh_token
 @app.post("/api/auth/refresh")
@@ -579,10 +578,11 @@ async def upload_resume(
             raise HTTPException(status_code=400, detail="不支持的文件类型")
         
         # 提取简历内容
-        content = await file_manager.extract_resume_content(file)
+        content =await file_manager.extract_resume_content(file)
 
         content=content+job
-        organized_content = await question_generator.organize_content(content, job)
+        #print("提取文件内容:",content)
+        organized_content =await question_generator.organize_content(content, job)
         print("成功提取简历内容:",organized_content)
         # # 创建面试记录
         # interview_id = await db_manager.create_interview_record(user_id, resume_id)

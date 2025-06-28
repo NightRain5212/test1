@@ -11,46 +11,49 @@ from time import mktime
 from urllib.parse import urlparse, urlencode
 from wsgiref.handlers import format_date_time
 from config import SPARK_CONFIG
+from config import SPARK_CONFIG1
 import os
 from typing import List, Dict, Any, Optional
+from sparkai.llm.llm import ChatSparkLLM
+from sparkai.core.messages import ChatMessage
 
 import websockets
 
 class SparkClient:
     def __init__(self):
         """初始化星火大模型客户端"""
-        self.appid = SPARK_CONFIG["app_id"]
-        self.api_key = SPARK_CONFIG["api_key"]
-        self.api_secret = SPARK_CONFIG["api_secret"]
+        self.appid = SPARK_CONFIG1["app_id"]
+        self.api_key = SPARK_CONFIG1["api_key"]
+        self.api_secret = SPARK_CONFIG1["api_secret"]
         self.spark_url = "wss://spark-api.xf-yun.com/v3.5/chat"  # Max环境
         self.domain = "generalv3.5"  # Max版本
         self.response_content = ""  # 用于存储响应内容
-        
-        # 检查配置是否完整
-        self._check_config()
-        
-    def _check_config(self):
-        """检查配置是否完整"""
-        if not all([self.appid, self.api_key, self.api_secret]):
-            raise ValueError(
-                "星火大模型配置不完整，请检查 .env 文件中的以下配置：\n"
-                "SPARK_APP_ID=你的应用ID\n"
-                "SPARK_API_KEY=你的API密钥\n"
-                "SPARK_API_SECRET=你的API密钥"
-            )
-            
-        print(f"使用星火大模型配置：")
-        print(f"- AppID: {self.appid}")
-        print(f"- API Key: {self.api_key[:8]}...")
-        print(f"- API Secret: {self.api_secret[:8]}...")
-        print(f"- URL: {self.spark_url}")
-        print(f"- Domain: {self.domain}")
-        
-        # 验证域名
-        url_parts = urlparse(self.spark_url)
-        if url_parts.netloc != "spark-api.xf-yun.com":
-            raise ValueError(f"无效的域名: {url_parts.netloc}，应为 spark-api.xf-yun.com")
-        
+        # 初始化客户端
+        self.spark = ChatSparkLLM(
+            spark_api_url=self.spark_url,  # Max 3.5版本URL
+            spark_app_id=self.appid,
+            spark_api_key=self.api_key,
+            spark_api_secret=self.api_secret,
+            spark_llm_domain='generalv3.5',  # Max 3.5的domain
+            streaming=False  # 是否流式输出
+        )
+    def chat(self,prompt,max_tokens=100):
+        messages = [ChatMessage(role="user", content=prompt)]
+        #print("开始chat：",prompt)
+        #response = self.spark.generate([messages])
+        response = self.spark.generate(
+            [messages],  # 消息列表
+            temperature=0.7,  # 控制随机性 (0~1，越高越随机)
+            max_tokens=max_tokens,  # 最大生成token数
+            top_k=4,  # 从概率最高的k个token中采样
+            top_p=0.8,  # 核采样阈值 (0~1)
+            streaming=False,  # 是否流式输出
+            stop=["。", "\n"],  # 遇到这些字符时停止生成
+            repetition_penalty=1.1  # 避免重复的惩罚系数 (>1)
+        )
+        #print("chat_response:",response)
+        return response.generations[0][0].text
+
     def _create_url(self):
         """生成鉴权URL"""
         try:
@@ -360,15 +363,7 @@ class SparkClient:
         except:
             return []
 
-    def _check_config(self):
-        """检查配置是否完整"""
-        if not all([self.appid, self.api_key, self.api_secret]):
-            print("警告：星火大模型配置不完整，将使用本地生成方法")
-            self._use_local = True
-        else:
-            self._use_local = False
-
-    async def chat(self, prompt):
+    async def chat1(self, prompt):
         """调用星火大模型API进行对话"""
         print("开始chat")
         # 如果配置不完整，使用本地生成方法

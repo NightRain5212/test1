@@ -38,7 +38,12 @@ SPARK_CONFIG = {
     "api_key": os.getenv("SPARK_API_KEY", ""),
     "api_secret": os.getenv("SPARK_API_SECRET", "")
 }
-
+# 星火大模型配置
+SPARK_CONFIG1 = {
+    "app_id": os.getenv("SPARK_APP_ID1", ""),
+    "api_key": os.getenv("SPARK_API_KEY1", ""),
+    "api_secret": os.getenv("SPARK_API_SECRET1", "")
+}
 # 检查星火大模型配置
 def check_spark_config():
     """检查星火大模型配置是否完整"""

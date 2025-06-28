@@ -290,14 +290,14 @@ async function handleResumeUpload({ file }) {
 
     if (response.data.code === 200) {
       message.success('上传成功')
-      console.log("上传成功！",response.data)
+      console.log("上传成功！",response.data.data)
       // 保存生成的问题
       if (response.data.data.questions && response.data.data.questions.length > 0) {
-        interviewQuestions.value = response.data.questions
+        //interviewQuestions.value = response.data.questions
         message.success('AI已生成面试问题')
         
         // 显示问题预览和确认对话框
-        showConfirmInterview()
+        //showConfirmInterview()
       } else {
         message.error('生成面试问题失败')
       }
